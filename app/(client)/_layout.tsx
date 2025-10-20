@@ -1,22 +1,26 @@
-import { Tabs, useRouter } from 'expo-router';
+import { Stack } from 'expo-router';
 import React from 'react';
-import { Pressable, Text } from 'react-native';
+import { HeaderBurger, MenuDrawerProvider } from '../../components/MenuDrawer';
 import { supabase } from '../../lib/supabase';
 
 export default function ClientLayout() {
-  const router = useRouter();
-  const handleSignOut = async () => { await supabase.auth.signOut(); router.replace('/(auth)'); };
+  const items = [
+    { label: 'Tienda', href: '/(client)', icon: { name: 'home-outline' } },
+    { label: 'Carrito', href: '/(client)/cart', icon: { name: 'cart-outline' } },
+    { label: 'Favoritos', href: '/(client)/favorites', icon: { name: 'heart-outline' } },
+    { label: 'Perfil', href: '/(client)/profile', icon: { name: 'person-outline' } },
+  ];
+  const handleLogout = async () => { await supabase.auth.signOut(); };
 
   return (
-    <Tabs screenOptions={{ headerRight: () => (
-      <Pressable onPress={handleSignOut} style={{ paddingHorizontal: 12, paddingVertical: 6 }}>
-        <Text style={{ color: '#d00', fontWeight: '600' }}>Salir</Text>
-      </Pressable>
-    )}}>
-      <Tabs.Screen name="index" options={{ title: 'Tienda' }} />
-      <Tabs.Screen name="cart" options={{ title: 'Carrito' }} />
-      <Tabs.Screen name="favorites" options={{ title: 'Favoritos' }} />
-      <Tabs.Screen name="profile" options={{ title: 'Perfil' }} />
-    </Tabs>
+    <MenuDrawerProvider items={items} groupBase="/(client)" onLogout={handleLogout}>
+      <Stack screenOptions={{ headerLeft: () => <HeaderBurger /> }}>
+        <Stack.Screen name="index" options={{ title: 'Tienda' }} />
+        <Stack.Screen name="cart" options={{ title: 'Carrito' }} />
+        <Stack.Screen name="favorites" options={{ title: 'Favoritos' }} />
+        <Stack.Screen name="profile" options={{ title: 'Perfil' }} />
+        <Stack.Screen name="product/[id]" options={{ title: 'Producto' }} />
+      </Stack>
+    </MenuDrawerProvider>
   );
 }

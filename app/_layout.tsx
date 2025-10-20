@@ -1,11 +1,12 @@
 import { Slot } from 'expo-router';
 import React from 'react';
-import { CartProvider } from '../providers/CartProvider';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+// Si tenés providers globales (CartProvider, Theme, etc.), mantenelos acá
 export default function RootLayout() {
   return (
-    <CartProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <Slot />
-    </CartProvider>
+    </GestureHandlerRootView>
   );
 }
