@@ -1,10 +1,21 @@
 import { Feather, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import type { Href } from 'expo-router';
 import { Link, usePathname, useRouter } from 'expo-router';
-import React, { createContext, PropsWithChildren, useContext, useMemo, useState } from 'react';
+import React, { createContext, PropsWithChildren, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+
+// Controlador imperativo global para abrir el menú sin contexto
+let openHandler: null | (() => void) = null;
+export function setMenuOpenHandler(fn: null | (() => void)) {
+  openHandler = fn;
+}
+export function openMenuDrawer() {
+  if (openHandler) {
+    openHandler();
+  }
+}
 
 type IconPack = 'Ionicons' | 'MaterialCommunityIcons' | 'Feather';
 type Item = {
@@ -76,7 +87,16 @@ export function MenuDrawerProvider({
   onLogout,
   logoutLabel = 'Cerrar sesión',
   children,
-}: PropsWithChildren<{ items: Item[]; groupBase: string; onLogout?: () => Promise<void> | void; logoutLabel?: string }>) {
+  edgeTopOffset = 0,
+  disableEdgeSwipe = false,
+}: PropsWithChildren<{
+  items: Item[];
+  groupBase: string;
+  onLogout?: () => Promise<void> | void;
+  logoutLabel?: string;
+  edgeTopOffset?: number;
+  disableEdgeSwipe?: boolean;
+}>) {
   const router = useRouter();
   const pathname = usePathname();
   const currentPath = normalizePath(pathname);
@@ -91,16 +111,24 @@ export function MenuDrawerProvider({
   const [open, setOpen] = useState(false);
   const translateX = useSharedValue(-drawerWidth);
 
-  const openMenu = () => {
+  const openMenu = useCallback(() => {
     setOpen(true);
     translateX.value = withTiming(0, { duration: 220 });
-  };
-  const closeMenu = () => {
+  }, [translateX]);
+
+  const closeMenu = useCallback(() => {
     translateX.value = withTiming(-drawerWidth, { duration: 180 }, (finished) => {
       if (finished) runOnJS(setOpen)(false);
     });
-  };
-  const ctxValue = useMemo(() => ({ openMenu, closeMenu }), []);
+  }, [drawerWidth, translateX]);
+
+  // Registrar el handler imperativo cuando el provider está montado
+  useEffect(() => {
+    setMenuOpenHandler(openMenu);
+    return () => setMenuOpenHandler(null);
+  }, [openMenu]);
+
+  const ctxValue = useMemo(() => ({ openMenu, closeMenu }), [openMenu, closeMenu]);
 
   // Cálculos
   const currentLeaf = useMemo(() => leafAfterGroup(absCurrent, groupBase), [absCurrent, groupBase]);
@@ -121,7 +149,7 @@ export function MenuDrawerProvider({
     return match?.label ?? '';
   }, [items, currentLeaf, groupBase]);
 
-  // Gestos nativos: usar translationX para compatibilidad de tipos
+  // Gestos nativos
   const startX = useSharedValue(0);
 
   const panToClose = Gesture.Pan()
@@ -129,7 +157,6 @@ export function MenuDrawerProvider({
       startX.value = translateX.value;
     })
     .onUpdate((e) => {
-      // e.translationX está tipado en todas las versiones
       translateX.value = clamp(startX.value + e.translationX, -drawerWidth, 0);
     })
     .onEnd(() => {
@@ -140,7 +167,7 @@ export function MenuDrawerProvider({
       }
     });
 
-  // Edge swipe para abrir
+  // Edge swipe para abrir: zona finita a la izquierda, por debajo del header
   const edgeSwipe = Gesture.Pan()
     .activeOffsetX(10)
     .onStart(() => {
@@ -159,7 +186,7 @@ export function MenuDrawerProvider({
     try {
       if (onLogout) await onLogout();
     } catch (e) {
-      // opcional: console.warn('Error al cerrar sesión:', e);
+      // opcional
     } finally {
       runOnJS(setSigningOut)(false);
       runOnJS(closeMenu)();
@@ -169,9 +196,12 @@ export function MenuDrawerProvider({
 
   return (
     <MenuContext.Provider value={ctxValue}>
-      {!open && (
+      {!open && !disableEdgeSwipe && (
         <GestureDetector gesture={edgeSwipe}>
-          <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { width: 24, left: 0 }]} />
+          <View
+            pointerEvents="box-only"
+            style={[styles.edgeSwipeZone, { top: edgeTopOffset }]}
+          />
         </GestureDetector>
       )}
 
@@ -249,20 +279,34 @@ export function MenuDrawerProvider({
   );
 }
 
-export function HeaderBurger() {
-  const { openMenu } = useMenuDrawer();
+// Ícono hamburguesa (blanco) que abre el drawer con controlador global
+export function HeaderBurger({ color = '#fff', size = 24 }: { color?: string; size?: number }) {
   return (
-    <Pressable accessibilityLabel="Abrir menú" onPress={openMenu} style={styles.burger}>
-      <View style={styles.bar} />
-      <View style={[styles.bar, { width: 18 }]} />
-      <View style={[styles.bar, { width: 22 }]} />
+    <Pressable
+      accessibilityLabel="Abrir menú"
+      onPress={openMenuDrawer}
+      style={styles.burger}
+      hitSlop={12}
+      testID="header-burger"
+    >
+      <View style={[styles.bar, { backgroundColor: color, width: size }]} />
+      <View style={[styles.bar, { backgroundColor: color, width: Math.round(size * 0.75) }]} />
+      <View style={[styles.bar, { backgroundColor: color, width: Math.round(size * 0.9) }]} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  edgeSwipeZone: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: 14,
+    backgroundColor: 'transparent',
+    zIndex: 1,
+  },
   burger: { padding: 8, borderRadius: 8 },
-  bar: { height: 2.5, backgroundColor: '#111', marginVertical: 3, width: 24, borderRadius: 2 },
+  bar: { height: 2.5, marginVertical: 3, borderRadius: 2 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   drawer: {
     position: 'absolute',

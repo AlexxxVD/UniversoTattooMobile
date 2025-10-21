@@ -4,17 +4,26 @@ import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { supabase } from '../lib/supabase';
 
+const USER_TABLE = 'User' as const;
+
 async function getUserRole(userId: string): Promise<'admin' | 'client' | null> {
   const { data, error } = await supabase
-    .from('User')
+    .from(USER_TABLE)
     .select('role')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
+
   if (error) {
-    console.warn('No se pudo obtener rol:', error.message);
+    console.warn('getUserRole error:', {
+      message: error.message,
+      details: (error as any).details,
+      hint: (error as any).hint,
+      code: (error as any).code,
+    });
+    // No bloquear navegación por esto; devolvemos null para que caiga a client
     return null;
   }
-  return (data?.role as 'admin' | 'client') ?? null;
+  return (data?.role as 'admin' | 'client') ?? 'client';
 }
 
 export default function RootEntry() {
@@ -53,7 +62,6 @@ export default function RootEntry() {
         if (role === 'admin') router.replace('/(admin)' as Href);
         else router.replace('/(client)' as Href);
       }
-      // Ignoramos TOKEN_REFRESHED/USER_UPDATED para evitar “saltos”
     });
 
     return () => {
