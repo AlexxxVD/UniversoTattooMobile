@@ -1,12 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Card from '../../components/ui/Card';
-import Screen from '../../components/ui/Screen';
-import SectionHeader from '../../components/ui/SectionHeader';
+import { Section } from '../../components/Section';
+import { StatCard } from '../../components/StatCard';
 import { Tables } from '../../lib/database.types';
 import { supabase } from '../../lib/supabase';
 import { getMonthStartISO, getTodayStartISO } from '../../lib/time';
-import { colors } from '../../theme/color';
 
 type Pedido = Tables<'Pedido'>;
 
@@ -93,130 +91,92 @@ export default function AdminDashboard() {
   }, [fetchMetrics]);
 
   return (
-    <Screen padded>
-      <ScrollView
-        contentContainerStyle={styles.container}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
-        }
-      >
-        <View style={styles.header}>
-          <Text style={styles.title}>Dashboard</Text>
-          <Text style={styles.subtitle}>Resumen de actividad y métricas</Text>
-        </View>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+    >
+      <Text style={styles.title}>Dashboard</Text>
 
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />
-        ) : error ? (
-          <Card style={{ padding: 16 }}>
-            <Text style={styles.error}>{error}</Text>
-          </Card>
-        ) : (
-          <>
-            {/* Métricas */}
-            <View style={styles.grid}>
-              <MetricCard label="Ingresos del mes" value={`$ ${ingresosMes.toLocaleString()}`} />
-              <MetricCard label="Pedidos hoy" value={`${pedidosHoy}`} />
-              <MetricCard label="Pendientes" value={`${pendientes}`} />
-              <MetricCard label="Clientes nuevos" value={`${clientesMes}`} />
-            </View>
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 20 }} />
+      ) : error ? (
+        <Text style={styles.error}>{error}</Text>
+      ) : (
+        <>
+          <View style={styles.grid}>
+            <StatCard label="Ingresos del mes" value={`$ ${ingresosMes.toLocaleString()}`} />
+            <StatCard label="Pedidos hoy" value={`${pedidosHoy}`} />
+            <StatCard label="Pendientes" value={`${pendientes}`} />
+            <StatCard label="Clientes nuevos" value={`${clientesMes}`} />
+          </View>
 
-            {/* Últimos pedidos */}
-            <Card style={{ marginTop: 12 }}>
-              <SectionHeader title="Últimos pedidos" subtitle="Actividad reciente" />
-              {ultimosPedidos.length === 0 ? (
-                <Text style={styles.muted}>No hay pedidos recientes.</Text>
-              ) : (
-                <View style={{ gap: 10 }}>
-                  {ultimosPedidos.map((p) => (
-                    <View key={p.id_pedido} style={styles.orderItem}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.orderTitle}>#{p.numero_pedido}</Text>
-                        <Text style={styles.orderSub}>
-                          {p.nombre_comprador ?? 'Cliente'} — {new Date(p.fecha_pedido).toLocaleString()}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.orderTotal}>$ {p.total.toLocaleString()}</Text>
-                        <Text style={[styles.badge, badgeColor(p.estado_pago)]}>{p.estado_pago}</Text>
-                      </View>
+          <Section title="Últimos pedidos">
+            {ultimosPedidos.length === 0 ? (
+              <Text style={styles.muted}>No hay pedidos recientes.</Text>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {ultimosPedidos.map((p) => (
+                  <View key={p.id_pedido} style={styles.orderItem}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.orderTitle}>#{p.numero_pedido}</Text>
+                      <Text style={styles.orderSub}>
+                        {p.nombre_comprador ?? 'Cliente'} — {new Date(p.fecha_pedido).toLocaleString()}
+                      </Text>
                     </View>
-                  ))}
-                </View>
-              )}
-            </Card>
-          </>
-        )}
-      </ScrollView>
-    </Screen>
+                    <View style={{ alignItems: 'flex-end' }}>
+                      <Text style={styles.orderTotal}>$ {p.total.toLocaleString()}</Text>
+                      <Text style={[styles.badge, badgeColor(p.estado_pago)]}>{p.estado_pago}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </Section>
+        </>
+      )}
+    </ScrollView>
   );
 }
 
 function badgeColor(estado: Pedido['estado_pago']) {
   switch (estado) {
     case 'PAGADO':
-      return { backgroundColor: 'rgba(34,197,94,0.15)', color: '#22C55E', borderColor: 'rgba(34,197,94,0.35)' };
+      return { backgroundColor: '#DCFCE7', color: '#166534' };
     case 'PENDIENTE':
-      return { backgroundColor: 'rgba(250,204,21,0.15)', color: '#F59E0B', borderColor: 'rgba(245,158,11,0.35)' };
+      return { backgroundColor: '#FEF9C3', color: '#854D0E' };
     case 'FALLIDO':
     case 'REEMBOLSADO':
-      return { backgroundColor: 'rgba(239,68,68,0.15)', color: '#EF4444', borderColor: 'rgba(239,68,68,0.35)' };
+      return { backgroundColor: '#FEE2E2', color: '#991B1B' };
     default:
-      return { backgroundColor: 'rgba(168,85,247,0.12)', color: colors.primary, borderColor: 'rgba(168,85,247,0.35)' };
+      return { backgroundColor: '#E5E7EB', color: '#111827' };
   }
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card style={styles.metricCard}>
-      <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={styles.metricValue}>{value}</Text>
-    </Card>
-  );
-}
-
 const styles = StyleSheet.create({
-  container: { paddingVertical: 12, gap: 12 },
-  header: { marginBottom: 4 },
-  title: { fontSize: 22, fontWeight: '800', color: colors.textPrimary, letterSpacing: 0.2 },
-  subtitle: { color: colors.textSecondary, marginTop: 2 },
-
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    rowGap: 12,
-  },
-  metricCard: {
-    width: '48%',
-  },
-  metricLabel: { color: colors.textSecondary, fontSize: 12, marginBottom: 6 },
-  metricValue: { color: colors.textPrimary, fontSize: 20, fontWeight: '800' },
-
+  container: { padding: 16, backgroundColor: '#F7F7F7', gap: 16 },
+  title: { fontSize: 22, fontWeight: '700' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   orderItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(17,18,22,0.6)',
-    borderRadius: 14,
+    backgroundColor: '#FFF',
+    borderRadius: 10,
     padding: 12,
     gap: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(38,38,38,0.9)',
   },
-  orderTitle: { color: colors.textPrimary, fontWeight: '800', fontSize: 16 },
-  orderSub: { color: colors.textSecondary },
-  orderTotal: { color: colors.textPrimary, fontWeight: '800' },
+  orderTitle: { fontWeight: '700', fontSize: 16 },
+  orderSub: { color: '#6B7280' },
+  orderTotal: { fontWeight: '700' },
   badge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingVertical: 2,
+    borderRadius: 6,
     overflow: 'hidden',
-    marginTop: 6,
+    marginTop: 4,
     fontSize: 12,
-    fontWeight: '700',
-    borderWidth: 1,
+    fontWeight: '600',
   } as any,
-  muted: { color: colors.textSecondary },
-  error: { color: '#FCA5A5' },
+  muted: { color: '#6B7280' },
+  error: { color: '#B91C1C' },
 });
