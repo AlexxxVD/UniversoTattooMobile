@@ -2,13 +2,13 @@ import type { Href } from 'expo-router';
 import { Link } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
-    Animated,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    useWindowDimensions,
-    View,
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 
 type Item = { label: string; href: Href | string };

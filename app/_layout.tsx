@@ -1,12 +1,13 @@
 import { Slot } from 'expo-router';
-import React from 'react';
+import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Toast from 'react-native-toast-message';
 
-// Si tenés providers globales (CartProvider, Theme, etc.), mantenelos acá
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Slot />
+      <Toast position="top" topOffset={Platform.select({ ios: 50, android: 20 })} />
     </GestureHandlerRootView>
   );
 }
