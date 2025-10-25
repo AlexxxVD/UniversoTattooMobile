@@ -1,16 +1,56 @@
 import { supabase } from '@/lib/supabase';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import Toast from 'react-native-toast-message';
 
+const C = {
+  bg: '#0E1116',
+  card: '#141821',
+  border: '#2A2F3A',
+  text: '#F3F4F6',
+  muted: '#A0A8B0',
+  primary: '#7C3AED',
+  success: '#22C55E',
+  warning: '#F59E0B',
+  danger: '#EF4444',
+};
+
 export default function ForgotPasswordScreen() {
+  const router = useRouter();
+
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Centrado vertical cuando no hay teclado
+  const [kbVisible, setKbVisible] = useState(false);
+  useEffect(() => {
+    const sh = Keyboard.addListener('keyboardDidShow', () => setKbVisible(true));
+    const hd = Keyboard.addListener('keyboardDidHide', () => setKbVisible(false));
+    return () => {
+      sh.remove();
+      hd.remove();
+    };
+  }, []);
+
+  const validateEmail = (v: string) => /^\S+@\S+\.\S+$/.test(v.trim().toLowerCase());
+
   async function handleReset() {
     const value = email.trim().toLowerCase();
-    if (!/^\S+@\S+\.\S+$/.test(value)) {
+    if (!validateEmail(value)) {
       Toast.show({ type: 'error', text1: 'Correo inválido', text2: 'Ingresá un correo válido' });
       return;
     }
@@ -19,9 +59,7 @@ export default function ForgotPasswordScreen() {
       setLoading(true);
       const redirectTo = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL || undefined;
 
-      const { error } = await supabase.auth.resetPasswordForEmail(value, {
-        redirectTo,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(value, { redirectTo });
 
       if (error) {
         Toast.show({
@@ -34,10 +72,12 @@ export default function ForgotPasswordScreen() {
 
       Toast.show({
         type: 'success',
-        text1: 'Revisa tu correo',
+        text1: 'Revisá tu correo',
         text2: 'Te enviamos un enlace para restablecer la contraseña',
       });
-      router.replace('./(auth)/login');
+
+      // Volver a la pantalla de login (tu login está en app/(auth)/index.tsx)
+      router.replace('/(auth)');
     } catch (e: any) {
       Toast.show({
         type: 'error',
@@ -50,51 +90,99 @@ export default function ForgotPasswordScreen() {
   }
 
   return (
-    <View style={{ flex: 1, padding: 16, gap: 12, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 22, fontWeight: '700', marginBottom: 8 }}>Recuperar contraseña</Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <KeyboardAvoidingView behavior={Platform.select({ ios: 'padding', android: undefined })} style={{ flex: 1 }}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={[
+            { padding: 16, paddingBottom: 28, flexGrow: 1 },
+            { justifyContent: kbVisible ? 'flex-start' : 'center' },
+          ]}
+        >
+          <View style={[styles.card, { padding: 16, gap: 14 }]}>
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <Text style={styles.title}>Recuperar contraseña</Text>
+              <Text style={{ color: C.muted, textAlign: 'center' }}>
+                Ingresá tu correo y te enviaremos un enlace para restablecerla
+              </Text>
+            </View>
 
-      <TextInput
-        placeholder="Correo electrónico"
-        value={email}
-        onChangeText={setEmail}
-        style={styles.input}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+            <View style={styles.inputRow}>
+              <Ionicons name="mail-outline" size={18} color="#C4B5FD" />
+              <TextInput
+                style={styles.input}
+                placeholder="Correo electrónico"
+                placeholderTextColor={C.muted}
+                value={email}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                textContentType="username"
+                returnKeyType="send"
+                onSubmitEditing={() => !loading && handleReset()}
+              />
+            </View>
 
-      <Pressable
-        onPress={handleReset}
-        disabled={loading}
-        style={({ pressed }) => [
-          styles.btn,
-          { opacity: loading || pressed ? 0.7 : 1 },
-        ]}
-      >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Enviar enlace</Text>}
-      </Pressable>
+            <Pressable
+              onPress={handleReset}
+              disabled={loading}
+              style={({ pressed }) => [
+                styles.btnPrimary,
+                (loading || pressed) && { opacity: 0.9 },
+              ]}
+            >
+              {loading ? (
+                <View style={styles.rowBtn}>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.btnText}>Enviando enlace...</Text>
+                </View>
+              ) : (
+                <View style={styles.rowBtn}>
+                  <Ionicons name="send-outline" size={18} color="#fff" />
+                  <Text style={styles.btnText}>Enviar enlace</Text>
+                </View>
+              )}
+            </Pressable>
 
-      <Pressable onPress={() => router.replace('./(auth)/login')}>
-        <Text style={{ textAlign: 'center', color: '#007aff' }}>
-          Volver a iniciar sesión
-        </Text>
-      </Pressable>
-    </View>
+            <Pressable onPress={() => router.replace('/(auth)')} style={{ alignSelf: 'center', marginTop: 6 }}>
+              <Text style={{ color: C.primary, fontWeight: '700' }}>Volver a iniciar sesión</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-const styles = {
-  input: {
+const styles = StyleSheet.create({
+  card: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+    borderColor: C.border,
+    backgroundColor: C.card,
+    borderRadius: 16,
   },
-  btn: {
-    marginTop: 8,
-    backgroundColor: '#111827',
+  title: { fontSize: 22, fontWeight: '800', color: C.text, textAlign: 'center' },
+
+  inputRow: {
+    minHeight: 48,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: '#11151B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  input: { flex: 1, color: C.text, paddingVertical: 10 },
+
+  btnPrimary: {
+    backgroundColor: C.primary,
     paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center' as const,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  btnText: { color: '#fff', fontWeight: '600' as const },
-};
+  btnText: { color: '#fff', fontWeight: '700' },
+  rowBtn: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+});

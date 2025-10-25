@@ -1,61 +1,76 @@
-import React from 'react';
-import { Text, TextInput, TextStyle, View, ViewStyle } from 'react-native';
-import { useTheme } from '../../theme';
+import React, { forwardRef } from 'react';
+import {
+  StyleProp,
+  StyleSheet,
+  Text,
+  TextInput,
+  TextInputProps,
+  TextStyle,
+  View,
+  ViewStyle,
+} from 'react-native';
 
-type Props = {
-  value: string;
-  onChangeText: (t: string) => void;
-  placeholder?: string;
+export type InputProps = TextInputProps & {
   label?: string;
   helperText?: string;
   error?: string;
-  left?: React.ReactNode;
-  right?: React.ReactNode;
-  secureTextEntry?: boolean;
-  keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'numeric';
-  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
-  containerStyle?: ViewStyle;
-  inputStyle?: TextStyle;
+  containerStyle?: StyleProp<ViewStyle>;
+  inputStyle?: StyleProp<TextStyle>;
+  labelStyle?: StyleProp<TextStyle>;
 };
 
-export function Input({
-  value, onChangeText, placeholder, label, helperText, error,
-  left, right, secureTextEntry, keyboardType = 'default', autoCapitalize = 'none',
-  containerStyle, inputStyle,
-}: Props) {
-  const { colors, radius, spacing } = useTheme();
-
-  return (
-    <View style={[{ marginBottom: spacing(3) }, containerStyle]}>
-      {label ? <Text style={{ color: colors.text, marginBottom: spacing(1), fontWeight: '600' }}>{label}</Text> : null}
-      <View style={{ position: 'relative' }}>
-        {left ? <View style={{ position: 'absolute', left: 12, top: 14 }}>{left}</View> : null}
+const Input = forwardRef<TextInput, InputProps>(
+  (
+    {
+      label,
+      helperText,
+      error,
+      containerStyle,
+      inputStyle,
+      labelStyle,
+      ...rest // incluye editable, placeholder, secureTextEntry, keyboardType, etc.
+    },
+    ref
+  ) => {
+    return (
+      <View style={[styles.container, containerStyle]}>
+        {!!label && <Text style={[styles.label, labelStyle]}>{label}</Text>}
         <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.textMuted}
-          secureTextEntry={secureTextEntry}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
+          ref={ref}
           style={[
-            {
-              height: 50,
-              borderWidth: 1,
-              borderColor: error ? colors.danger : colors.inputBorder,
-              backgroundColor: colors.inputBg,
-              color: colors.white,
-              borderRadius: radius.md,
-              paddingHorizontal: left ? 40 : 14,
-              paddingRight: right ? 44 : 14,
-            },
+            styles.input,
             inputStyle,
+            !!error && { borderColor: '#ef4444' },
           ]}
+          {...rest}
         />
-        {right ? <View style={{ position: 'absolute', right: 12, top: 14 }}>{right}</View> : null}
+        {!!error ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : !!helperText ? (
+          <Text style={styles.helper}>{helperText}</Text>
+        ) : null}
       </View>
-      {error ? <Text style={{ color: colors.danger, marginTop: 6 }}>{error}</Text> : null}
-      {!error && helperText ? <Text style={{ color: colors.textMuted, marginTop: 6 }}>{helperText}</Text> : null}
-    </View>
-  );
-}
+    );
+  }
+);
+
+Input.displayName = 'Input';
+
+export { Input };
+export default Input;
+
+const styles = StyleSheet.create({
+  container: { gap: 6 },
+  label: { color: '#E5E7EB', fontSize: 12, fontWeight: '600' },
+  input: {
+    height: 48,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2A2F3A',
+    backgroundColor: '#11151B',
+    color: '#F3F4F6',
+    paddingHorizontal: 12,
+  },
+  helper: { color: '#A0A8B0', fontSize: 12 },
+  error: { color: '#EF4444', fontSize: 12 },
+});

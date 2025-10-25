@@ -53,11 +53,11 @@ export default function CartScreen() {
   const [couponCode, setCouponCode] = useState('');
   const subtotal = getTotalPrice();
   const discount = getDiscountAmount();
+  const count = getTotalItems();
   const isFreeShipping = subtotal >= FREE_SHIPPING_MIN;
   const total = subtotal - discount; // Envío se calcula en checkout
 
   const header = useMemo(() => {
-    const count = getTotalItems();
     return (
       <View style={styles.header}>
         <View style={styles.headerRow}>
@@ -104,7 +104,8 @@ export default function CartScreen() {
         </View>
       </View>
     );
-  }, [getTotalItems, router, clearCart, isFreeShipping, subtotal]);
+    // Dependencias: que se re-renderice al cambiar conteo o subtotal/envío gratis
+  }, [count, isFreeShipping, subtotal, router, clearCart]);
 
   if (items.length === 0) {
     return (
@@ -128,7 +129,7 @@ export default function CartScreen() {
         contentContainerStyle={{ padding: 16, gap: 12 }}
         ListHeaderComponent={header}
         data={items}
-        keyExtractor={(it) => it.id}
+        keyExtractor={(it) => String(it.id)}
         renderItem={({ item }) => {
           const qty = item.quantity ?? item.cantidad ?? 1;
           const maxStock = item.stock ?? 999;
@@ -211,6 +212,7 @@ export default function CartScreen() {
                     placeholder="Código de cupón"
                     placeholderTextColor="#9CA3AF"
                     style={styles.couponInput}
+                    autoCapitalize="none"
                   />
                   <Pressable
                     onPress={() => {
@@ -250,7 +252,7 @@ export default function CartScreen() {
             {/* Resumen */}
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal ({getTotalItems()} productos)</Text>
+                <Text style={styles.summaryLabel}>Subtotal ({count} productos)</Text>
                 <Text style={styles.summaryValue}>{money(subtotal)}</Text>
               </View>
               {appliedCoupon ? (
@@ -268,11 +270,9 @@ export default function CartScreen() {
               <Text style={styles.shippingNote}>El costo de envío se calcula en el checkout.</Text>
 
               <Pressable
-                onPress={() => {
-                  // Si más adelante creamos /(client)/checkout, lo activamos:
-                  Alert.alert('Checkout', 'Próximamente conectamos el flujo de pago/checkout en la app.');
-                }}
-                style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}
+                onPress={() => router.push('../(client)/checkout')}
+                disabled={items.length === 0}
+                style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }, items.length === 0 && { opacity: 0.6 }]}
               >
                 <Text style={styles.primaryText}>Proceder al checkout</Text>
                 <Ionicons name="arrow-forward-outline" size={16} color="#fff" />

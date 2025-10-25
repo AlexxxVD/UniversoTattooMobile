@@ -64,11 +64,25 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
-function RenderIcon({ pack = 'Ionicons', name, color = '#111', size = 20 }: { pack?: IconPack; name: string; color?: string; size?: number }) {
+function RenderIcon({ pack = 'Ionicons', name, color = '#A0A8B0', size = 20 }: { pack?: IconPack; name: string; color?: string; size?: number }) {
   if (pack === 'MaterialCommunityIcons') return <MaterialCommunityIcons name={name as any} size={size} color={color} />;
   if (pack === 'Feather') return <Feather name={name as any} size={size} color={color} />;
   return <Ionicons name={name as any} size={size} color={color} />;
 }
+
+// Tema negro + violeta
+const C = {
+  bg: '#0E1116',
+  text: '#F3F4F6',
+  muted: '#A0A8B0',
+  violet: '#7C3AED',
+  activeBg: 'rgba(124,58,237,0.22)',
+  hoverBg: 'rgba(255,255,255,0.05)',
+  border: 'rgba(124,58,237,0.30)',
+  dangerBg: 'rgba(239,68,68,0.12)',
+  dangerBorder: 'rgba(239,68,68,0.35)',
+  danger: '#FCA5A5',
+};
 
 export function MenuDrawerProvider({
   items,
@@ -121,7 +135,7 @@ export function MenuDrawerProvider({
     return match?.label ?? '';
   }, [items, currentLeaf, groupBase]);
 
-  // Gestos nativos: usar translationX para compatibilidad de tipos
+  // Gestos nativos
   const startX = useSharedValue(0);
 
   const panToClose = Gesture.Pan()
@@ -129,7 +143,6 @@ export function MenuDrawerProvider({
       startX.value = translateX.value;
     })
     .onUpdate((e) => {
-      // e.translationX está tipado en todas las versiones
       translateX.value = clamp(startX.value + e.translationX, -drawerWidth, 0);
     })
     .onEnd(() => {
@@ -159,7 +172,7 @@ export function MenuDrawerProvider({
     try {
       if (onLogout) await onLogout();
     } catch (e) {
-      // opcional: console.warn('Error al cerrar sesión:', e);
+      // noop
     } finally {
       runOnJS(setSigningOut)(false);
       runOnJS(closeMenu)();
@@ -192,7 +205,9 @@ export function MenuDrawerProvider({
             {!!currentLabel && (
               <View style={styles.currentWrap}>
                 <Text style={styles.currentPrefix}>Actual:</Text>
-                <Text style={styles.currentLabel}>{currentLabel}</Text>
+                <View style={styles.currentPill}>
+                  <Text style={styles.currentLabel}>{currentLabel}</Text>
+                </View>
               </View>
             )}
 
@@ -201,14 +216,14 @@ export function MenuDrawerProvider({
                 <Link key={idx} href={it.href as Href} asChild>
                   <Pressable
                     onPress={closeMenu}
-                    style={({ pressed }) => [styles.item, pressed && { backgroundColor: '#f2f2f2' }]}
+                    style={({ pressed }) => [styles.item, pressed && { backgroundColor: C.hoverBg }]}
                   >
                     <View style={styles.itemRow}>
                       {it.icon?.name ? (
                         <RenderIcon
                           pack={it.icon.pack}
                           name={it.icon.name}
-                          color={it.icon.color ?? '#111'}
+                          color={it.icon.color ?? C.muted}
                           size={it.icon.size ?? 20}
                         />
                       ) : null}
@@ -225,19 +240,19 @@ export function MenuDrawerProvider({
                 disabled={signingOut}
                 style={({ pressed }) => [
                   styles.logoutButton,
-                  pressed && !signingOut && { opacity: 0.85 },
+                  pressed && !signingOut && { opacity: 0.9 },
                   signingOut && { opacity: 0.7 },
                 ]}
               >
                 {signingOut ? (
                   <View style={styles.row}>
-                    <ActivityIndicator size="small" color="#991B1B" />
+                    <ActivityIndicator size="small" color={C.danger} />
                     <Text style={styles.logoutText}> Cerrando…</Text>
                   </View>
                 ) : (
                   <View style={styles.row}>
-                    <Ionicons name="log-out-outline" size={18} color="#B91C1C" />
-                    <Text style={styles.logoutText}> Cerrar sesión</Text>
+                    <Ionicons name="log-out-outline" size={18} color={C.danger} />
+                    <Text style={styles.logoutText}> {logoutLabel}</Text>
                   </View>
                 )}
               </Pressable>
@@ -249,54 +264,70 @@ export function MenuDrawerProvider({
   );
 }
 
-export function HeaderBurger() {
+export function HeaderBurger({ color = '#FFFFFF' }: { color?: string }) {
   const { openMenu } = useMenuDrawer();
   return (
     <Pressable accessibilityLabel="Abrir menú" onPress={openMenu} style={styles.burger}>
-      <View style={styles.bar} />
-      <View style={[styles.bar, { width: 18 }]} />
-      <View style={[styles.bar, { width: 22 }]} />
+      <View style={[styles.bar, { backgroundColor: color }]} />
+      <View style={[styles.bar, { width: 18, backgroundColor: color }]} />
+      <View style={[styles.bar, { width: 22, backgroundColor: color }]} />
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   burger: { padding: 8, borderRadius: 8 },
-  bar: { height: 2.5, backgroundColor: '#111', marginVertical: 3, width: 24, borderRadius: 2 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
+  bar: { height: 2.5, backgroundColor: '#FFFFFF', marginVertical: 3, width: 24, borderRadius: 2 },
+
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
+
   drawer: {
     position: 'absolute',
     left: 0,
     top: 0,
     bottom: 0,
-    backgroundColor: '#fff',
+    backgroundColor: C.bg,
     paddingTop: 42,
     paddingHorizontal: 12,
-    elevation: 12,
+    elevation: 18,
     shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    borderRightWidth: 1,
+    borderRightColor: C.border,
   },
+
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, paddingHorizontal: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: C.text },
   closeButton: { padding: 6 },
-  closeText: { color: '#007AFF' },
+  closeText: { color: C.violet, fontWeight: '700' },
+
   currentWrap: { flexDirection: 'row', alignItems: 'center', marginTop: 6, marginBottom: 8, gap: 6, paddingHorizontal: 4 },
-  currentPrefix: { color: '#6B7280' },
-  currentLabel: { fontWeight: '700', color: '#1D4ED8', backgroundColor: '#EEF2FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  currentPrefix: { color: C.muted },
+  currentPill: {
+    backgroundColor: C.activeBg,
+    borderWidth: 1,
+    borderColor: C.border,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  currentLabel: { fontWeight: '800', color: C.text },
+
   items: { marginTop: 8, gap: 6 },
-  item: { paddingVertical: 12, paddingHorizontal: 8, borderRadius: 8 },
+  item: { paddingVertical: 12, paddingHorizontal: 8, borderRadius: 10 },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  itemText: { fontSize: 16 },
+  itemText: { fontSize: 16, color: C.text },
+
   footer: { marginTop: 'auto', paddingVertical: 8, paddingHorizontal: 4 },
   logoutButton: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: C.dangerBg,
     borderWidth: 1,
-    borderColor: '#FCA5A5',
+    borderColor: C.dangerBorder,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  logoutText: { color: '#B91C1C', fontWeight: '700' },
+  logoutText: { color: C.danger, fontWeight: '800' },
   row: { flexDirection: 'row', alignItems: 'center' },
 });
