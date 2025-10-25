@@ -10,7 +10,9 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
@@ -83,6 +85,90 @@ export default function ProfileScreen() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithTotals | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Edit profile
+  const [showEdit, setShowEdit] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [edit, setEdit] = useState({
+    nombre: '',
+    apellido: '',
+    email: '',
+    telefono: '',
+    fecha_nacimiento: '',
+    acepta_marketing: false,
+    dni: '',
+    calle: '',
+    numero: '',
+    departamento: '',
+    barrio: '',
+    ciudad: '',
+    provincia: '',
+    codigo_postal: '',
+  });
+
+  const startEdit = useCallback(() => {
+    if (!cliente) return;
+    setEdit({
+      nombre: cliente.nombre ?? '',
+      apellido: cliente.apellido ?? '',
+      email: cliente.email ?? '',
+      telefono: cliente.telefono ?? '',
+      fecha_nacimiento: cliente.fecha_nacimiento ? cliente.fecha_nacimiento.split('T')[0] : '',
+      acepta_marketing: !!cliente.acepta_marketing,
+      dni: cliente.dni ?? '',
+      calle: cliente.calle ?? '',
+      numero: cliente.numero ?? '',
+      departamento: cliente.departamento ?? '',
+      barrio: cliente.barrio ?? '',
+      ciudad: cliente.ciudad ?? '',
+      provincia: cliente.provincia ?? '',
+      codigo_postal: cliente.codigo_postal ?? '',
+    });
+    setShowEdit(true);
+  }, [cliente]);
+
+  const saveEdit = useCallback(async () => {
+    if (!cliente?.id_cliente) return;
+    if (!edit.nombre.trim() || !edit.apellido.trim() || !edit.email.trim()) {
+      Toast.show({ type: 'error', text1: 'Completá nombre, apellido y email' });
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const payload: Partial<Cliente> = {
+        nombre: edit.nombre.trim(),
+        apellido: edit.apellido.trim(),
+        email: edit.email.trim(),
+        telefono: edit.telefono.trim() || null,
+        fecha_nacimiento: edit.fecha_nacimiento ? new Date(edit.fecha_nacimiento).toISOString() : null,
+        acepta_marketing: !!edit.acepta_marketing,
+        dni: edit.dni.trim() || null,
+        calle: edit.calle.trim() || null,
+        numero: edit.numero.trim() || null,
+        departamento: edit.departamento.trim() || null,
+        barrio: edit.barrio.trim() || null,
+        ciudad: edit.ciudad.trim() || null,
+        provincia: edit.provincia.trim() || null,
+        codigo_postal: edit.codigo_postal.trim() || null,
+        fecha_actualizacion: new Date().toISOString(),
+      };
+      const { data, error } = await supabase
+        .from('Cliente')
+        .update(payload as any)
+        .eq('id_cliente', cliente.id_cliente)
+        .select('*')
+        .maybeSingle();
+      if (error) throw error;
+      setCliente((data as any) ?? cliente);
+      setShowEdit(false);
+      Toast.show({ type: 'success', text1: 'Perfil actualizado' });
+    } catch (e: any) {
+      console.warn('[profile] saveEdit error:', e?.message ?? e);
+      Toast.show({ type: 'error', text1: 'No se pudo guardar' });
+    } finally {
+      setSavingEdit(false);
+    }
+  }, [cliente, edit]);
+
   // Cargar sesión y cliente por userId
   const loadProfile = useCallback(async () => {
     setLoading(true);
@@ -117,7 +203,7 @@ export default function ProfileScreen() {
     if (!userId) return;
     setLoadingFavs(true);
     try {
-      const uid = userId; // ya está garantizado arriba
+      const uid = userId; // asegurado arriba
       const { data: favRows, error: favErr } = await supabase
         .from('Favoritos')
         .select('producto_id')
@@ -253,7 +339,7 @@ export default function ProfileScreen() {
         const { error } = await supabase
           .from('Favoritos')
           .delete()
-          .eq('user_id', userId) // userId está garantizado por el guard anterior
+          .eq('user_id', userId)
           .eq('producto_id', producto_id);
         if (error) throw error;
         setFavorites((prev) => prev.filter((f) => f.producto_id !== producto_id));
@@ -368,7 +454,6 @@ export default function ProfileScreen() {
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         <View style={styles.center}>
           <ActivityIndicator color={C.primary} size="large" />
-          <Text style={{ color: C.muted, marginTop: 8 }}>Cargando perfil…</Text>
         </View>
       </SafeAreaView>
     );
@@ -391,6 +476,7 @@ export default function ProfileScreen() {
                 {cliente?.telefono ? `Tel: ${cliente.telefono}` : 'Teléfono no especificado'}
               </Text>
             </View>
+            <Button title="Editar" variant="outline" onPress={startEdit} />
           </View>
         </Card>
 
@@ -430,9 +516,9 @@ export default function ProfileScreen() {
             <Card>
               <View style={{ padding: 14, gap: 10 }}>
                 <Text style={{ color: C.text, fontWeight: '800' }}>Información</Text>
-                <InfoRow icon="mail-outline" label="Email" value="(desde sesión)" />
+                <InfoRow icon="mail-outline" label="Email" value={cliente?.email ?? '(desde sesión)'} />
                 <InfoRow icon="call-outline" label="Teléfono" value={cliente?.telefono ?? 'No especificado'} />
-                <InfoRow icon="id-card-outline" label="DNI" value={(cliente as any)?.dni ?? 'No especificado'} />
+                <InfoRow icon="id-card-outline" label="DNI" value={cliente?.dni ?? 'No especificado'} />
                 <InfoRow icon="home-outline" label="Dirección" value={formatDireccion(cliente)} />
               </View>
             </Card>
@@ -495,6 +581,55 @@ export default function ProfileScreen() {
           </Card>
         )}
       </ScrollView>
+
+      {/* Edit Profile Modal */}
+      <Modal visible={showEdit} transparent animationType="fade" onRequestClose={() => setShowEdit(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalCard, { width: '94%' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }}>Editar perfil</Text>
+              <Pressable onPress={() => setShowEdit(false)} hitSlop={6}>
+                <Ionicons name="close" size={20} color={C.muted} />
+              </Pressable>
+            </View>
+
+            <ScrollView contentContainerStyle={{ gap: 12, paddingTop: 8 }}>
+              <Section title="Información básica" />
+              <Row>
+                <LabeledInput label="Nombre" value={edit.nombre} onChangeText={(t) => setEdit((s) => ({ ...s, nombre: t }))} />
+                <LabeledInput label="Apellido" value={edit.apellido} onChangeText={(t) => setEdit((s) => ({ ...s, apellido: t }))} />
+              </Row>
+              <LabeledInput label="Email" keyboardType="email-address" autoCapitalize="none" value={edit.email} onChangeText={(t) => setEdit((s) => ({ ...s, email: t }))} />
+              <LabeledInput label="Teléfono" keyboardType="phone-pad" value={edit.telefono} onChangeText={(t) => setEdit((s) => ({ ...s, telefono: t }))} />
+              <LabeledInput label="Fecha de nacimiento (AAAA-MM-DD)" placeholder="1990-10-05" value={edit.fecha_nacimiento} onChangeText={(t) => setEdit((s) => ({ ...s, fecha_nacimiento: t }))} />
+              <ToggleRow label="Newsletter (acepta marketing)" value={edit.acepta_marketing} onValueChange={(v) => setEdit((s) => ({ ...s, acepta_marketing: v }))} />
+
+              <Section title="Documento" />
+              <LabeledInput label="DNI" value={edit.dni} onChangeText={(t) => setEdit((s) => ({ ...s, dni: t }))} />
+
+              <Section title="Dirección" />
+              <Row>
+                <LabeledInput label="Calle" value={edit.calle} onChangeText={(t) => setEdit((s) => ({ ...s, calle: t }))} />
+                <LabeledInput label="Número" value={edit.numero} onChangeText={(t) => setEdit((s) => ({ ...s, numero: t }))} />
+              </Row>
+              <Row>
+                <LabeledInput label="Departamento (opcional)" value={edit.departamento} onChangeText={(t) => setEdit((s) => ({ ...s, departamento: t }))} />
+                <LabeledInput label="Barrio (opcional)" value={edit.barrio} onChangeText={(t) => setEdit((s) => ({ ...s, barrio: t }))} />
+              </Row>
+              <Row>
+                <LabeledInput label="Ciudad" value={edit.ciudad} onChangeText={(t) => setEdit((s) => ({ ...s, ciudad: t }))} />
+                <LabeledInput label="Provincia" value={edit.provincia} onChangeText={(t) => setEdit((s) => ({ ...s, provincia: t }))} />
+              </Row>
+              <LabeledInput label="Código postal" value={edit.codigo_postal} onChangeText={(t) => setEdit((s) => ({ ...s, codigo_postal: t }))} />
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
+                <Button title="Cancelar" variant="outline" onPress={() => setShowEdit(false)} />
+                <Button title={savingEdit ? 'Guardando…' : 'Guardar cambios'} onPress={saveEdit} disabled={savingEdit} />
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       {/* Order details modal */}
       <Modal visible={detailsOpen} transparent animationType="fade" onRequestClose={() => setDetailsOpen(false)}>
@@ -751,4 +886,64 @@ const styles = StyleSheet.create({
 
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   thumb: { width: 36, height: 36, backgroundColor: '#1A202C', borderRadius: 6, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+
+  // Edit inputs
+  label: { color: C.text, fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  input: {
+    minHeight: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: '#11151B',
+    paddingHorizontal: 12,
+    color: C.text,
+  },
 });
+
+function Section({ title }: { title: string }) {
+  return <Text style={{ color: C.text, fontWeight: '800', marginTop: 6 }}>{title}</Text>;
+}
+
+function Row({ children }: { children: React.ReactNode }) {
+  return <View style={{ flexDirection: 'row', gap: 10 }}>{children}</View>;
+}
+
+function LabeledInput({
+  label,
+  value,
+  onChangeText,
+  keyboardType,
+  placeholder,
+  autoCapitalize,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad' | 'numeric' | 'url';
+  placeholder?: string;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+}) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={styles.label}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType}
+        placeholder={placeholder}
+        placeholderTextColor={C.muted}
+        autoCapitalize={autoCapitalize}
+        style={styles.input}
+      />
+    </View>
+  );
+}
+
+function ToggleRow({ label, value, onValueChange }: { label: string; value: boolean; onValueChange: (v: boolean) => void }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Text style={{ color: C.text, fontWeight: '700' }}>{label}</Text>
+      <Switch value={value} onValueChange={onValueChange} />
+    </View>
+  );
+}
