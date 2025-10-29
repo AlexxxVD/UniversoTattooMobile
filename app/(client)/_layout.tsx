@@ -72,9 +72,14 @@ function CartHeaderButton() {
 }
 
 export default function ClientLayout() {
+  // Menú actualizado:
+  // - Inicio (nuevo Home en /(client)/index)
+  // - Tienda (/(client)/store)
+  // - Perfil (incluye sección de Favoritos dentro)
+  // - Sobre nosotros
   const items = [
-    { label: 'Tienda', href: '/(client)', icon: { name: 'home-outline' } },
-    { label: 'Favoritos', href: '/(client)/favorites', icon: { name: 'heart-outline' } },
+    { label: 'Inicio', href: '/(client)', icon: { name: 'home-outline' } },
+    { label: 'Tienda', href: '/(client)/store', icon: { name: 'storefront-outline' } },
     { label: 'Perfil', href: '/(client)/profile', icon: { name: 'person-outline' } },
     { label: 'Sobre nosotros', href: '/(client)/about', icon: { name: 'information-circle-outline' } },
   ];
@@ -103,9 +108,11 @@ export default function ClientLayout() {
           headerRight: () => <CartHeaderButton />,
         }}
       >
-        <Stack.Screen name="index" options={{ title: 'Tienda' }} />
+        {/* Nuevo Home y Tienda (store). Se quita la pantalla independiente de Favoritos */}
+        <Stack.Screen name="index" options={{ title: 'Inicio' }} />
+        <Stack.Screen name="store" options={{ title: 'Tienda' }} />
+
         <Stack.Screen name="cart" options={{ title: 'Carrito' }} />
-        <Stack.Screen name="favorites" options={{ title: 'Favoritos' }} />
         <Stack.Screen name="profile" options={{ title: 'Perfil' }} />
         <Stack.Screen name="about" options={{ title: 'Sobre nosotros' }} />
         <Stack.Screen name="product/[id]" options={{ title: 'Producto' }} />

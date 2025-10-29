@@ -1,0 +1,1 @@
+export const DEFAULT_BLURHASH = 'LEHV6nWB2yk8pyo0adR*.7kCMdnj';

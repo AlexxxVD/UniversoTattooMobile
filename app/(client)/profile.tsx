@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,7 +7,6 @@ import {
   Image,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -15,6 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
 import { Button } from '../../components/ui/Button';
@@ -69,6 +69,8 @@ export default function ProfileScreen() {
     spacing: (n: number) => 4 * n,
   };
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
+
   const addItem = useCartStore((s) => s.addItem);
 
   const [loading, setLoading] = useState(true);
@@ -104,6 +106,14 @@ export default function ProfileScreen() {
     provincia: '',
     codigo_postal: '',
   });
+
+  // Abrir pestaña desde query (?tab=favorites)
+  useEffect(() => {
+    const q = typeof params?.tab === 'string' ? params.tab.toLowerCase() : '';
+    if (q === 'favorites' || q === 'orders' || q === 'overview') {
+      setTab(q as TabKey);
+    }
+  }, [params?.tab]);
 
   const startEdit = useCallback(() => {
     if (!cliente) return;
@@ -198,20 +208,19 @@ export default function ProfileScreen() {
     }
   }, [router]);
 
-  // Favoritos: 2 pasos (no hay FK en Favoritos)
+  // Favoritos
   const loadFavorites = useCallback(async () => {
     if (!userId) return;
     setLoadingFavs(true);
     try {
-      const uid = userId; // asegurado arriba
       const { data: favRows, error: favErr } = await supabase
         .from('Favoritos')
         .select('producto_id')
-        .eq('user_id', uid);
+        .eq('user_id', userId);
 
       if (favErr) throw favErr;
 
-      const ids = (favRows ?? []).map((f) => f.producto_id);
+      const ids = Array.from(new Set((favRows ?? []).map((f) => Number(f.producto_id)).filter(Boolean)));
       if (ids.length === 0) {
         setFavorites([]);
         return;
@@ -220,15 +229,16 @@ export default function ProfileScreen() {
       const { data: products, error: prodErr } = await supabase
         .from('Producto')
         .select('id_producto,nombre,descripcion,precio_base,stock_total,sku,ProductoImagen(url_imagen,es_principal)')
-        .in('id_producto', ids);
+        .in('id_producto', ids)
+        .eq('es_activo', true);
 
       if (prodErr) throw prodErr;
 
-      const map = new Map<number, any>();
-      (products ?? []).forEach((p) => map.set((p as any).id_producto, p));
+      const byId = new Map<number, any>();
+      (products ?? []).forEach((p) => byId.set((p as any).id_producto, p));
       const enriched: FavoriteItem[] = ids.map((id) => ({
         producto_id: id,
-        Producto: map.get(id),
+        Producto: byId.get(id),
       }));
       setFavorites(enriched);
     } catch (e: any) {
@@ -239,7 +249,7 @@ export default function ProfileScreen() {
     }
   }, [userId]);
 
-  // Pedidos del cliente: filtrar por clienteId y sumar items
+  // Pedidos
   const loadOrders = useCallback(async () => {
     if (!cliente?.id_cliente) {
       setOrders([]);
@@ -250,7 +260,7 @@ export default function ProfileScreen() {
     try {
       const { data, error } = await supabase
         .from('Pedido')
-        .select('id_pedido,numero_pedido,fecha_pedido,estado,metodo_pago,tipo_envio,envio,tracking_number')
+        .select('id_pedido,numero_pedido,fecha_pedido,estado,metodo_pago,metodo_envio,envio,tracking_number')
         .eq('clienteId', cliente.id_cliente)
         .order('fecha_pedido', { ascending: false })
         .limit(50);
@@ -309,12 +319,17 @@ export default function ProfileScreen() {
     }
   }, [cliente?.id_cliente, loadOrders]);
 
+  const isPickup = (o: any) => {
+    const m = (o?.metodo_envio || o?.tipo_envio || '').toString().toUpperCase();
+    return m === 'PICKUP' || m === 'RETIRO';
+  };
+
   const stats = useMemo(() => {
     const totalOrders = orders.length;
     const pendingOrders = orders.filter((o) => (o as any).estado?.toString().toUpperCase?.() === 'PENDIENTE').length;
     const completedOrders = orders.filter((o) => (o as any).estado?.toString().toUpperCase?.() === 'COMPLETADO').length;
     const totalSpent = orders.reduce((acc, o) => {
-      const shipping = o.tipo_envio === 'retiro' ? 0 : Number((o as any).envio ?? 0);
+      const shipping = isPickup(o) ? 0 : Number((o as any).envio ?? 0);
       return acc + Number(o._total ?? 0) + shipping;
     }, 0);
     const lastOrderDate = orders[0]?.fecha_pedido ?? null;
@@ -336,19 +351,22 @@ export default function ProfileScreen() {
         return;
       }
       try {
+        // Optimista
+        setFavorites((prev) => prev.filter((f) => f.producto_id !== producto_id));
         const { error } = await supabase
           .from('Favoritos')
           .delete()
           .eq('user_id', userId)
           .eq('producto_id', producto_id);
         if (error) throw error;
-        setFavorites((prev) => prev.filter((f) => f.producto_id !== producto_id));
         Toast.show({ type: 'success', text1: 'Quitado de favoritos' });
       } catch (e: any) {
         Toast.show({ type: 'error', text1: 'No se pudo quitar' });
+        // refrescar para evitar inconsistencias
+        loadFavorites();
       }
     },
-    [userId]
+    [userId, loadFavorites]
   );
 
   const openOrderDetails = useCallback(async (order: OrderWithTotals) => {
@@ -451,18 +469,18 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
         <View style={styles.center}>
           <ActivityIndicator color={C.primary} size="large" />
         </View>
-      </SafeAreaView>
+      </RNSafeAreaView>
     );
   }
 
   const fullName = cliente ? `${cliente.nombre ?? ''} ${cliente.apellido ?? ''}`.trim() || 'Usuario' : 'Usuario';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+    <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         {/* Header del perfil */}
         <Card>
@@ -561,9 +579,10 @@ export default function ProfileScreen() {
                   <ActivityIndicator color={C.primary} />
                 </View>
               ) : favorites.length === 0 ? (
-                <View style={{ alignItems: 'center', paddingVertical: 24, gap: 6 }}>
+                <View style={{ alignItems: 'center', paddingVertical: 24, gap: 10 }}>
                   <Ionicons name="heart-outline" size={36} color={C.muted} />
                   <Text style={{ color: C.muted }}>No tenés productos favoritos.</Text>
+                  <Button title="Ir a la tienda" onPress={() => router.push('../(client)/store')} />
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -573,6 +592,31 @@ export default function ProfileScreen() {
                       fav={f}
                       onRemove={() => removeFavorite(f.producto_id)}
                       onOpen={() => router.push(`/(client)/product/${f.producto_id}` as any)}
+                      onAdd={() => {
+                        const p: any = f.Producto;
+                        if (!p) return;
+                        const mainImg = Array.isArray(p.ProductoImagen)
+                          ? (p.ProductoImagen.find((im: any) => im.es_principal) ?? p.ProductoImagen[0])?.url_imagen
+                          : null;
+                        const stock = Number(p.stock_total ?? 0);
+                        if (stock <= 0) {
+                          Toast.show({ type: 'info', text1: 'Sin stock' });
+                          return;
+                        }
+                        addItem({
+                          id: String(p.id_producto),
+                          nombre: p.nombre,
+                          precio: Number(p.precio_base ?? 0),
+                          imagen: mainImg ?? null,
+                          stock,
+                          categoria: '',
+                          sku: p.sku ?? null,
+                          peso: null,
+                          cantidad: 1,
+                          quantity: 1,
+                        } as any);
+                        Toast.show({ type: 'success', text1: 'Agregado al carrito' });
+                      }}
                     />
                   ))}
                 </View>
@@ -649,7 +693,7 @@ export default function ProfileScreen() {
             ) : (
               <ScrollView contentContainerStyle={{ gap: 10 }}>
                 <InfoRow icon="card-outline" label="Método de pago" value={String((selectedOrder as any)?.metodo_pago ?? '—')} />
-                <InfoRow icon="navigate-outline" label="Entrega" value={String((selectedOrder as any)?.tipo_envio ?? '—')} />
+                <InfoRow icon="navigate-outline" label="Entrega" value={String((selectedOrder as any)?.metodo_envio ?? (selectedOrder as any)?.tipo_envio ?? '—')} />
                 {(selectedOrder as any)?.tracking_number ? (
                   <InfoRow icon="pricetag-outline" label="Seguimiento" value={String((selectedOrder as any)?.tracking_number)} mono />
                 ) : null}
@@ -697,7 +741,7 @@ export default function ProfileScreen() {
                   <Text style={{ color: C.text, fontWeight: '800' }}>
                     {formatCurrency(
                       Number(selectedOrder?._total ?? 0) +
-                        ((selectedOrder as any)?.tipo_envio === 'retiro' ? 0 : Number((selectedOrder as any)?.envio ?? 0))
+                        (isPickup(selectedOrder) ? 0 : Number((selectedOrder as any)?.envio ?? 0))
                     )}
                   </Text>
                 </View>
@@ -711,7 +755,7 @@ export default function ProfileScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </RNSafeAreaView>
   );
 }
 
@@ -756,31 +800,54 @@ function formatDireccion(c: Cliente | null): string {
   return parts.length ? parts.join(', ') : 'No especificada';
 }
 
-function FavoriteCard({ fav, onRemove, onOpen }: { fav: FavoriteItem; onRemove: () => void; onOpen: () => void }) {
+function FavoriteCard({
+  fav,
+  onRemove,
+  onOpen,
+  onAdd,
+}: {
+  fav: FavoriteItem;
+  onRemove: () => void;
+  onOpen: () => void;
+  onAdd: () => void;
+}) {
   const p: any = fav.Producto;
   const img = Array.isArray(p?.ProductoImagen)
     ? (p.ProductoImagen.find((im: any) => im.es_principal) ?? p.ProductoImagen[0])?.url_imagen
     : undefined;
+  const price =
+    typeof p?.precio_base === 'number'
+      ? p.precio_base.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })
+      : '—';
 
   return (
-    <Pressable onPress={onOpen} style={({ pressed }) => [styles.favCard, pressed && { opacity: 0.95 }]}>
-      <View style={styles.thumbLarge}>
-        {img ? (
-          <Image source={{ uri: img }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-        ) : (
-          <Ionicons name="image-outline" size={20} color={C.muted} />
-        )}
-      </View>
-      <View style={{ gap: 4, flex: 1 }}>
-        <Text style={{ color: C.text, fontWeight: '700' }} numberOfLines={1}>{p?.nombre ?? 'Producto'}</Text>
-        <Text style={{ color: '#A78BFA', fontWeight: '800' }} numberOfLines={1}>
-          {typeof p?.precio_base === 'number' ? p.precio_base.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' }) : '—'}
-        </Text>
-      </View>
-      <Pressable onPress={(e) => { e.stopPropagation(); onRemove(); }} hitSlop={8}>
-        <Ionicons name="heart-dislike-outline" size={18} color="#FCA5A5" />
+    <View style={styles.favCard}>
+      <Pressable onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={styles.thumbLarge}>
+          {img ? (
+            <Image source={{ uri: img }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          ) : (
+            <Ionicons name="image-outline" size={20} color={C.muted} />
+          )}
+        </View>
+        <View style={{ gap: 4, flex: 1 }}>
+          <Text style={{ color: C.text, fontWeight: '700' }} numberOfLines={1}>
+            {p?.nombre ?? 'Producto'}
+          </Text>
+          <Text style={{ color: '#A78BFA', fontWeight: '800' }} numberOfLines={1}>
+            {price}
+          </Text>
+        </View>
       </Pressable>
-    </Pressable>
+
+      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+        <Button title="Ver" variant="outline" onPress={onOpen} />
+        <Button title="Agregar" onPress={onAdd} />
+        <Pressable onPress={onRemove} hitSlop={8} style={{ paddingHorizontal: 6, justifyContent: 'center' }}>
+          <Ionicons name="heart-dislike-outline" size={18} color="#FCA5A5" />
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
@@ -796,7 +863,7 @@ function OrderRow({ item, onView, onReorder }: { item: OrderWithTotals; onView: 
       : { bg: 'rgba(156,163,175,0.15)', fg: '#E5E7EB', br: 'rgba(156,163,175,0.35)' };
 
   const total =
-    Number(item._total ?? 0) + (item.tipo_envio === 'retiro' ? 0 : Number((item as any).envio ?? 0));
+    Number(item._total ?? 0) + ((item as any).metodo_envio?.toString().toUpperCase?.() === 'PICKUP' ? 0 : Number((item as any).envio ?? 0));
 
   return (
     <View style={styles.orderCard}>
@@ -855,9 +922,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
   thumbLarge: {
     width: 44,

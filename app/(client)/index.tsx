@@ -1,520 +1,429 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Pressable,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    Animated,
+    FlatList,
+    Image,
+    Linking,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions
 } from 'react-native';
-import Toast from 'react-native-toast-message';
+import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
+import { API_BASE, apiGet } from '../../lib/api';
 
-import { Card } from '../../components/ui/Card';
-import { useCartStore } from '../../lib/cart-store';
-import { Tables } from '../../lib/database.types';
-import { supabase } from '../../lib/supabase';
+const C = {
+  bg: '#0E1116',
+  card: '#141821',
+  border: '#2A2F3A',
+  text: '#F3F4F6',
+  muted: '#A0A8B0',
+  primary: '#7C3AED',
+  primarySoft: 'rgba(124,58,237,0.14)',
+  pink: '#EC4899',
+  purple: '#A855F7',
+  info: '#60A5FA',
+};
 
-type CategoriaRow = Tables<'Categoria'>;
-type ProductoRow = Tables<'Producto'>;
-
-type Product = {
-  id_producto: number;
+type ProductoDestacado = {
+  id: number;
   nombre: string;
   descripcion: string;
   precio: number;
   stock: number;
-  img: string | null;
   sku?: string | null;
-  peso?: number | null;
-  variantes?: any[];
-  categoria: { id_categoria: number | null; nombre: string };
+  categoria: { id: number; nombre: string } | null;
+  imagen: string | null;
+  alt_text?: string | null;
 };
 
-const C = {
-  bg: '#0E1116',
-  card: '#151823',
-  border: '#272C36',
-  text: '#F3F4F6',
-  muted: '#9AA4AF',
-  primary: '#7C3AED',
-  primarySoft: 'rgba(124,58,237,0.14)',
-  green: '#22C55E',
-  amber: '#F59E0B',
-  red: '#EF4444',
-};
+type Category = { name: string; image: string; link: string };
 
-const CARD_HEIGHT = 300;     // altura consistente del “rectangulito”
-const IMAGE_HEIGHT = 170;    // alto fijo de la caja de imagen (no se corta)
+// Prefijo para imágenes que en web están en /img/...
+function img(src: string) {
+  if (/^https?:\/\//i.test(src)) return src;
+  const base = (API_BASE || '').replace(/\/+$/, '');
+  return `${base}${src.startsWith('/') ? '' : '/'}${src}`;
+}
 
-export default function ShopScreen() {
+// CATEGORIES como array mutable tipado, para evitar readonly y unknown
+const CATEGORIES: Category[] = [
+  { name: 'Máquinas', image: '/img/maquinas.webp', link: '/(client)/store?categoria=Máquinas' },
+  { name: 'Agujas', image: '/img/agujas.webp', link: '/(client)/store?categoria=Agujas' },
+  { name: 'Tintas', image: '/img/tintas.webp', link: '/(client)/store?categoria=Tintas' },
+  { name: 'Accesorios', image: '/img/accesorios.webp', link: '/(client)/store?categoria=Accesorios' },
+];
+
+const TESTIMONIALS = [
+  {
+    name: 'Nahuel Bulay',
+    role: 'Tatuador en B-Ink',
+    quote:
+      'La web de Universo Tattoo es súper clara y fácil de usar. Encontramos todo lo que necesitamos para el estudio y los pedidos siempre llegan rápido y bien embalados.',
+    image: '/img/bink.webp',
+    instagram: 'https://www.instagram.com/b_ink_cdelu/',
+  },
+  {
+    name: 'Ariel Baldessari',
+    role: 'Tatuador y organizador de convención de tatuajes',
+    quote:
+      'Universo Tattoo nos facilita conseguir insumos de alta calidad sin complicaciones. La web es intuitiva, con buenas fotos y descripciones precisas de cada producto.',
+    image: '/img/ariel-baldessari.webp',
+    instagram: 'https://www.instagram.com/ariel_baldessari/',
+  },
+  {
+    name: 'Amai Tattoo',
+    role: 'Tatuadora especializada en anime',
+    quote:
+      'Comprar en la web de Universo Tattoo es rápido y seguro. Siempre tienen stock de lo que busco y su atención al cliente es excelente.',
+    image: '/img/amaitattoo.webp',
+    instagram: 'https://www.instagram.com/amaixtattoo/',
+  },
+] as const;
+
+export default function ClientHome() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
 
-  const [loading, setLoading] = useState(true);
-  const [categoriesLoading, setCategoriesLoading] = useState(true);
-  const [items, setItems] = useState<Product[]>([]);
-  const [categorias, setCategorias] = useState<CategoriaRow[]>([]);
-  const [favSet, setFavSet] = useState<Set<number>>(new Set());
-  const [userId, setUserId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Filtros/orden/búsqueda
-  const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'Todos' | string>('Todos');
-  const [minPrice, setMinPrice] = useState<number | ''>('');
-  const [maxPrice, setMaxPrice] = useState<number | ''>('');
-  const [sort, setSort] = useState<'price-asc' | 'price-desc' | 'name-asc'>('price-asc');
+  const [featured, setFeatured] = useState<ProductoDestacado[]>([]);
+  const [loadingFeatured, setLoadingFeatured] = useState(true);
 
-  // Cargar sesión + favoritos del usuario
+  const glow = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase.auth.getSession();
-      const uid = data.session?.user?.id ?? null;
-      setUserId(uid);
-      if (uid) {
-        const { data: favs, error } = await supabase
-          .from('Favoritos')
-          .select('producto_id')
-          .eq('user_id', uid);
-        if (!error) setFavSet(new Set((favs ?? []).map((f) => f.producto_id)));
-      }
-    })();
-  }, []);
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 2000, useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 2000, useNativeDriver: true }),
+      ])
+    ).start();
+  }, [glow]);
 
-  const loadCategories = useCallback(async () => {
-    setCategoriesLoading(true);
+  const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
+  const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.5] });
+
+  async function loadFeaturedProducts(retry = 0) {
     try {
-      const { data, error } = await supabase
-        .from('Categoria')
-        .select('id_categoria,nombre,es_activa,orden')
-        .eq('es_activa', true)
-        .order('orden', { ascending: true });
-      if (error) throw error;
-      setCategorias((data ?? []) as any);
-    } catch (e: any) {
-      console.warn('[shop] categories error:', e?.message ?? e);
-    } finally {
-      setCategoriesLoading(false);
-    }
-  }, []);
-
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('Producto')
-        .select(
-          'id_producto,nombre,descripcion,precio_base,stock_total,sku,peso,categoriaId,ProductoImagen(url_imagen,es_principal),Categoria(id_categoria,nombre)'
-        )
-        .eq('es_activo', true)
-        .order('fecha_actualizacion', { ascending: false })
-        .limit(200);
-
-      if (error) throw error;
-
-      const mapped: Product[] = (data ?? []).map((r: any) => {
-        const imgs: any[] = Array.isArray(r.ProductoImagen) ? r.ProductoImagen : [];
-        const principal = imgs.find((im) => im?.es_principal) ?? imgs[0];
-        return {
-          id_producto: r.id_producto,
-          nombre: r.nombre,
-          descripcion: r.descripcion,
-          precio: Number(r.precio_base ?? 0),
-          stock: Number(r.stock_total ?? 0),
-          img: principal?.url_imagen ?? null,
-          sku: r.sku ?? null,
-          peso: r.peso ?? null,
-          variantes: [],
-          categoria: {
-            id_categoria: r.Categoria?.id_categoria ?? r.categoriaId ?? null,
-            nombre: r.Categoria?.nombre ?? 'Sin categoría',
-          },
-        };
-      });
-
-      setItems(mapped);
-
-      if (mapped.length) {
-        const prices = mapped.map((p) => p.precio);
-        setMinPrice(Math.min(...prices));
-        setMaxPrice(Math.max(...prices));
-      } else {
-        setMinPrice('');
-        setMaxPrice('');
-      }
-    } catch (e: any) {
-      console.error('[shop] products error:', e?.message ?? e);
-      Toast.show({ type: 'error', text1: 'No se pudieron cargar productos' });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadCategories();
-    loadProducts();
-  }, [loadCategories, loadProducts]);
-
-  const filtered = useMemo(() => {
-    let arr = [...items];
-
-    const q = search.trim().toLowerCase();
-    if (q) {
-      arr = arr.filter(
-        (p) =>
-          p.nombre.toLowerCase().includes(q) ||
-          (p.descripcion || '').toLowerCase().includes(q) ||
-          (p.categoria?.nombre || '').toLowerCase().includes(q)
+      setLoadingFeatured(true);
+      const data = await apiGet<{ productos: ProductoDestacado[] }>(
+        '/api/productos/destacados',
+        { limit: 8 },
+        { headers: { 'Cache-Control': 'no-cache' } }
       );
+      setFeatured(Array.isArray(data?.productos) ? data.productos : []);
+    } catch {
+      if (retry < 2) setTimeout(() => loadFeaturedProducts(retry + 1), 800 * (retry + 1));
+      else setFeatured([]);
+    } finally {
+      setLoadingFeatured(false);
     }
-
-    if (categoryFilter !== 'Todos') {
-      arr = arr.filter((p) => p.categoria?.nombre === categoryFilter);
-    }
-
-    const min = typeof minPrice === 'number' ? minPrice : -Infinity;
-    const max = typeof maxPrice === 'number' ? maxPrice : Infinity;
-    arr = arr.filter((p) => p.precio >= min && p.precio <= max);
-
-    if (sort === 'price-asc') arr.sort((a, b) => a.precio - b.precio);
-    else if (sort === 'price-desc') arr.sort((a, b) => b.precio - a.precio);
-    else if (sort === 'name-asc') arr.sort((a, b) => a.nombre.localeCompare(b.nombre));
-
-    return arr;
-  }, [items, search, categoryFilter, minPrice, maxPrice, sort]);
-
-  const requireAuth = useCallback(async () => {
-    // Refresca sesión por si caducó
-    const { data } = await supabase.auth.getSession();
-    const uid = data.session?.user?.id ?? null;
-    if (!uid) {
-      Toast.show({ type: 'info', text1: 'Iniciá sesión para usar favoritos' });
-      return null;
-    }
-    setUserId(uid);
-    return uid;
-  }, []);
-
-  const toggleFavorite = useCallback(
-    async (productId: number) => {
-      const uid = userId ?? (await requireAuth());
-      if (!uid) return;
-
-      const isFav = favSet.has(productId);
-
-      // Optimista
-      setFavSet((prev) => {
-        const n = new Set(prev);
-        if (isFav) n.delete(productId);
-        else n.add(productId);
-        return n;
-      });
-
-      try {
-        if (isFav) {
-          const { error } = await supabase
-            .from('Favoritos')
-            .delete()
-            .eq('user_id', uid)
-            .eq('producto_id', productId);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase
-            .from('Favoritos')
-            .insert({ user_id: uid, producto_id: productId });
-          if (error) throw error;
-        }
-      } catch (e: any) {
-        // revertir
-        setFavSet((prev) => {
-          const n = new Set(prev);
-          if (isFav) n.add(productId);
-          else n.delete(productId);
-          return n;
-        });
-        console.error('[favorites] error:', e);
-        Toast.show({
-          type: 'error',
-          text1: 'Error al actualizar favoritos',
-          text2: e?.message ?? 'Revisá las políticas RLS de Favoritos',
-        });
-      }
-    },
-    [userId, favSet, requireAuth]
-  );
-
-  const openProduct = useCallback(
-    (id: number) => {
-      router.push(`/(client)/product/${id}` as any);
-    },
-    [router]
-  );
-
-  const addToCart = (p: Product) => {
-    if (p.stock <= 0) {
-      Toast.show({ type: 'info', text1: 'Sin stock' });
-      return;
-    }
-    useCartStore.getState().addItem({
-      id: String(p.id_producto),
-      nombre: p.nombre,
-      precio: p.precio,
-      imagen: p.img,
-      stock: p.stock,
-      categoria: p.categoria?.nombre,
-      sku: p.sku ?? null,
-      peso: p.peso ?? null,
-      cantidad: 1,
-      quantity: 1,
-    } as any);
-    Toast.show({ type: 'success', text1: 'Agregado al carrito' });
-  };
-
-  const header = (
-    <View style={{ gap: 12 }}>
-      {/* Título + acceso a Favoritos */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View>
-          <Text style={{ color: '#C4B5FD', fontWeight: '900', fontSize: 22 }}>Tienda</Text>
-          <Text style={{ color: C.muted, marginTop: 2 }}>Descubrí nuestra selección</Text>
-        </View>
-        <Pressable
-          onPress={() => router.push('/(client)/favorites' as any)}
-          style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
-          hitSlop={8}
-        >
-          <Ionicons name="heart" size={18} color="#F472B6" />
-        </Pressable>
-      </View>
-
-      {/* Stats rápidos */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10 }}>
-        <Stat label="Productos" value={String(items.length)} />
-        <Stat label="Mostrados" value={String(filtered.length)} />
-        <Stat label="Categorías" value={String(categorias.length)} />
-      </View>
-
-      {/* Filtros básicos */}
-      <View style={{ gap: 8 }}>
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Buscar productos…"
-          placeholderTextColor={C.muted}
-          style={styles.input}
-        />
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TextInput
-            value={minPrice === '' ? '' : String(minPrice)}
-            onChangeText={(t) => setMinPrice(t === '' ? '' : Number(t))}
-            placeholder="Min $"
-            placeholderTextColor={C.muted}
-            keyboardType="numeric"
-            style={[styles.input, { flex: 1 }]}
-          />
-          <TextInput
-            value={maxPrice === '' ? '' : String(maxPrice)}
-            onChangeText={(t) => setMaxPrice(t === '' ? '' : Number(t))}
-            placeholder="Max $"
-            placeholderTextColor={C.muted}
-            keyboardType="numeric"
-            style={[styles.input, { flex: 1 }]}
-          />
-        </View>
-
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <SegBtn label="Precio ↑" active={sort === 'price-asc'} onPress={() => setSort('price-asc')} />
-          <SegBtn label="Precio ↓" active={sort === 'price-desc'} onPress={() => setSort('price-desc')} />
-          <SegBtn label="Nombre A-Z" active={sort === 'name-asc'} onPress={() => setSort('name-asc')} />
-        </View>
-
-        {/* Chips de categorías (scrollable) */}
-        <View style={{ height: 40 }}>
-          <FlatList
-            data={[{ id_categoria: -1, nombre: 'Todos' } as any, ...categorias]}
-            keyExtractor={(c) => String(c.id_categoria)}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ gap: 8 }}
-            renderItem={({ item }) => (
-              <Chip
-                label={item.nombre}
-                active={categoryFilter === item.nombre || (item.id_categoria === -1 && categoryFilter === 'Todos')}
-                onPress={() => setCategoryFilter(item.id_categoria === -1 ? 'Todos' : item.nombre)}
-              />
-            )}
-          />
-        </View>
-      </View>
-    </View>
-  );
-
-  const renderItem = ({ item }: { item: Product }) => {
-    const isLow = item.stock > 0 && item.stock <= 5;
-    const out = item.stock === 0;
-    const isFav = favSet.has(item.id_producto);
-
-    return (
-      <Card>
-        {/* RECTÁNGULO ANCHO COMPLETO */}
-        <Pressable onPress={() => openProduct(item.id_producto)} style={[styles.cardRect, { height: CARD_HEIGHT }]}>
-          {/* Imagen: no se corta (contain) */}
-          <View style={styles.imageBox}>
-            {out ? <View style={styles.imageOverlay} /> : null}
-            {item.img ? (
-              <Image source={{ uri: item.img }} style={styles.image} resizeMode="contain" />
-            ) : (
-              <View style={[styles.image, { alignItems: 'center', justifyContent: 'center' }]}>
-                <Ionicons name="cube-outline" size={28} color={C.muted} />
-              </View>
-            )}
-
-            {/* Badges */}
-            {out ? (
-              <View style={[styles.badge, { backgroundColor: 'rgba(239,68,68,0.95)' }]}>
-                <Text style={[styles.badgeText, { color: '#fff' }]}>Sin stock</Text>
-              </View>
-            ) : isLow ? (
-              <View style={[styles.badge, { backgroundColor: 'rgba(245,158,11,0.95)' }]}>
-                <Text style={styles.badgeText}>¡Últimas unidades!</Text>
-              </View>
-            ) : null}
-
-            {/* Acciones sobre imagen */}
-            <View style={styles.overlayActions}>
-              <Pressable onPress={() => openProduct(item.id_producto)} style={styles.overlayBtn} hitSlop={8}>
-                <Ionicons name="eye-outline" size={16} color="#fff" />
-              </Pressable>
-              <Pressable onPress={() => toggleFavorite(item.id_producto)} style={styles.overlayBtn} hitSlop={8}>
-                <Ionicons name={isFav ? 'heart' : 'heart-outline'} size={16} color={isFav ? '#F472B6' : '#fff'} />
-              </Pressable>
-            </View>
-          </View>
-
-          {/* Contenido uniforme */}
-          <View style={styles.content}>
-            <View style={styles.rowBetween}>
-              <Text numberOfLines={1} style={styles.catPill}>
-                {item.categoria?.nombre}
-              </Text>
-              <Text style={[styles.stockText, out ? styles.stockRed : isLow ? styles.stockAmber : styles.stockGreen]}>
-                {out ? 'Agotado' : `Stock: ${item.stock}`}
-              </Text>
-            </View>
-
-            <Text style={styles.title} numberOfLines={2}>
-              {item.nombre}
-            </Text>
-
-            <View style={styles.footerRow}>
-              <Text style={styles.price}>{toCurrency(item.precio)}</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable
-                  onPress={() => openProduct(item.id_producto)}
-                  style={[styles.ctaIcon, { backgroundColor: C.primary }]}
-                  hitSlop={6}
-                >
-                  <Ionicons name="eye-outline" size={16} color="#fff" />
-                </Pressable>
-                <Pressable
-                  onPress={() => addToCart(item)}
-                  style={[styles.ctaIcon, { backgroundColor: out ? 'rgba(255,255,255,0.08)' : '#10B981' }]}
-                  disabled={out}
-                  hitSlop={6}
-                >
-                  <Ionicons name="cart-outline" size={16} color="#fff" />
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Pressable>
-      </Card>
-    );
-  };
-
-  if (loading) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-        <View style={styles.center}>
-          <ActivityIndicator color={C.primary} size="large" />
-          <Text style={{ color: C.muted, marginTop: 8 }}>Cargando productos…</Text>
-        </View>
-      </SafeAreaView>
-    );
   }
 
+  useEffect(() => {
+    loadFeaturedProducts();
+  }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadFeaturedProducts();
+    setRefreshing(false);
+  };
+
+  const openURL = (url: string) => Linking.openURL(url).catch(() => {});
+  const openInstagram = () => openURL('https://www.instagram.com/universotattoo_insumos/');
+  // Reemplazá por tu número real en formato 549XXXXXXXXXX
+  const openWhatsApp = () => openURL('https://wa.me/549xxxxxxxxxx?text=Hola%20Universo%20Tattoo%20%F0%9F%91%8B');
+
+  const videoHeight = useMemo(() => {
+    const pad = 24;
+    return Math.max(180, Math.round((width - pad * 2) * (9 / 16)));
+  }, [width]);
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
-      <FlatList
-        data={filtered}
-        keyExtractor={(p) => String(p.id_producto)}
-        renderItem={renderItem}
-        // UNA SOLA COLUMNA → rectángulos anchos apilados (como tu dibujo)
-        numColumns={1}
-        contentContainerStyle={{ padding: 12, gap: 12, paddingBottom: 28 }}
-        ListHeaderComponent={header}
-        ListEmptyComponent={
-          <View style={{ alignItems: 'center', paddingVertical: 32, gap: 6 }}>
-            <Ionicons name="cube-outline" size={36} color={C.muted} />
-            <Text style={{ color: C.muted }}>No hay productos para mostrar.</Text>
+    <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
+      >
+        {/* HERO */}
+        <View style={{ minHeight: 420, justifyContent: 'center' }}>
+          <LinearGradient colors={['rgba(10,10,12,1)', 'rgba(10,10,12,0.98)']} style={StyleSheet.absoluteFill} />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.glowBlob,
+              { backgroundColor: C.primary, opacity: glowOpacity, transform: [{ scale: glowScale }] },
+            ]}
+          />
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.glowBlob,
+              { backgroundColor: C.pink, top: '42%', left: '65%', opacity: glowOpacity, transform: [{ scale: glowScale }] },
+            ]}
+          />
+
+          <View style={{ padding: 16, gap: 12 }}>
+            <Text style={styles.heroTitle}>
+              <Text style={{ color: '#C4B5FD' }}>Insumos Premium</Text> para tatuajes profesionales
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              Descubrí nuestra selección de productos de alta calidad para artistas que buscan excelencia.
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable onPress={() => router.push('/(client)/store' as any)} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.95 }]}>
+                <Ionicons name="storefront-outline" size={18} color="#fff" />
+                <Text style={styles.primaryText}>Explorar productos</Text>
+              </Pressable>
+              <Pressable onPress={() => router.push('/(client)/about' as any)} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
+                <Ionicons name="information-circle-outline" size={18} color="#C4B5FD" />
+                <Text style={styles.ghostText}>Sobre nosotros</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+              <Pill icon="shield-checkmark-outline" label="Productos certificados" />
+              <Pill icon="trail-sign-outline" label="Envío a todo el país" />
+              <Pill icon="flash-outline" label="Soporte técnico" />
+            </View>
           </View>
-        }
-      />
-    </SafeAreaView>
+        </View>
+
+        {/* Video Lanzamiento */}
+        <Section title="Lanzamiento Oficial" subtitle="Cómo Universo Tattoo está revolucionando el mundo de los insumos">
+          <View style={styles.videoWrap}>
+            <WebView
+              style={{ width: '100%', height: videoHeight, backgroundColor: '#000' }}
+              source={{ uri: 'https://www.youtube.com/embed/UdMqkpcwB9k' }}
+              allowsFullscreenVideo
+              javaScriptEnabled
+              domStorageEnabled
+            />
+          </View>
+
+          <View style={{ alignItems: 'center', gap: 8, marginTop: 10 }}>
+            <Text style={{ color: C.muted }}>¿Te gustó lo que viste? ¡Sumate a la comunidad!</Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable onPress={() => router.push('/(client)/store' as any)} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
+                <Ionicons name="pricetags-outline" size={16} color="#C4B5FD" />
+                <Text style={styles.ghostText}>Ver productos</Text>
+              </Pressable>
+              <Pressable onPress={openInstagram} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
+                <Ionicons name="logo-instagram" size={16} color="#C4B5FD" />
+                <Text style={styles.ghostText}>Instagram</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Section>
+
+        {/* Categorías */}
+        <Section title="Explorá nuestras categorías" subtitle="Todo para tu estudio o práctica profesional">
+          <View style={{ gap: 10 }}>
+            {chunk(CATEGORIES, 2).map((row, idx) => (
+              <View key={`cat-row-${idx}`} style={{ flexDirection: 'row', gap: 10 }}>
+                {row.map((cat: Category) => (
+                  <Pressable
+                    key={cat.name}
+                    onPress={() => router.push(cat.link as any)}
+                    style={({ pressed }) => [styles.categoryCard, pressed && { opacity: 0.95 }]}
+                  >
+                    <Image source={{ uri: img(cat.image) }} style={styles.categoryImg} resizeMode="cover" />
+                    <LinearGradient
+                      colors={['rgba(0,0,0,0.75)', 'transparent']}
+                      start={{ x: 0.5, y: 1 }}
+                      end={{ x: 0.5, y: 0 }}
+                      style={StyleSheet.absoluteFill}
+                    />
+                    <View style={styles.categoryInfo}>
+                      <Text style={styles.categoryTitle}>{cat.name}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={{ color: '#A78BFA', fontWeight: '700' }}>Ver productos</Text>
+                        <Ionicons name="chevron-forward" size={14} color="#A78BFA" />
+                      </View>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </View>
+        </Section>
+
+        {/* Destacados */}
+        <Section title="Productos destacados" subtitle="Nuestra selección de los mejores insumos">
+          {loadingFeatured ? (
+            <View style={{ gap: 10 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <View key={`sk-${i}`} style={styles.card}>
+                  <View style={{ height: 160, backgroundColor: '#1A1F2A', borderRadius: 10 }} />
+                  <View style={{ height: 12 }} />
+                  <View style={{ height: 16, backgroundColor: '#1A1F2A', borderRadius: 6, width: '55%' }} />
+                  <View style={{ height: 8 }} />
+                  <View style={{ height: 12, backgroundColor: '#1A1F2A', borderRadius: 6, width: '80%' }} />
+                </View>
+              ))}
+            </View>
+          ) : featured.length > 0 ? (
+            <View style={{ gap: 10 }}>
+              {featured.map((p) => (
+                <View key={p.id} style={styles.card}>
+                  <Image
+                    source={{ uri: p.imagen || img('/placeholder.svg') }}
+                    style={styles.productImg}
+                    resizeMode="cover"
+                  />
+                  <View style={{ padding: 10, gap: 6 }}>
+                    <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }} numberOfLines={2}>
+                      {p.nombre}
+                    </Text>
+                    {!!p.descripcion && (
+                      <Text style={{ color: C.muted }} numberOfLines={2}>
+                        {p.descripcion}
+                      </Text>
+                    )}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ color: '#C4B5FD', fontWeight: '900', fontSize: 18 }}>{toCurrency(p.precio)}</Text>
+                      <Pressable
+                        onPress={() => router.push(`/(client)/product/${p.id}` as any)}
+                        style={({ pressed }) => [styles.smallBtn, pressed && { opacity: 0.95 }]}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: '800' }}>Ver detalles</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              ))}
+              <Pressable
+                onPress={() => router.push('/(client)/store' as any)}
+                style={({ pressed }) => [styles.ghostBtn, { alignSelf: 'center', marginTop: 6 }, pressed && { opacity: 0.95 }]}
+              >
+                <Ionicons name="arrow-forward" size={16} color="#C4B5FD" />
+                <Text style={styles.ghostText}>Ver todos los productos</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View style={[styles.card, { alignItems: 'center' }]}>
+              <Text style={{ color: C.muted, marginBottom: 10 }}>
+                No hay productos destacados disponibles en este momento
+              </Text>
+              <Pressable onPress={() => loadFeaturedProducts()} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
+                <Ionicons name="refresh" size={16} color="#C4B5FD" />
+                <Text style={styles.ghostText}>Recargar</Text>
+              </Pressable>
+            </View>
+          )}
+        </Section>
+
+        {/* Testimonios */}
+        <Section title="Lo que dicen nuestros clientes" subtitle="Profesionales que confían en Universo Tattoo">
+          <FlatList
+            data={TESTIMONIALS}
+            keyExtractor={(t) => t.name}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 10, paddingRight: 10 }}
+            renderItem={({ item }) => (
+              <Pressable onPress={() => openURL(item.instagram)} style={({ pressed }) => [styles.testimonialCard, pressed && { opacity: 0.95 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Image source={{ uri: img(item.image) }} style={{ width: 48, height: 48, borderRadius: 999 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: C.text, fontWeight: '800' }}>{item.name}</Text>
+                    <Text style={{ color: '#A78BFA', fontSize: 12 }}>{item.role}</Text>
+                  </View>
+                </View>
+                <Text style={{ color: C.muted, marginTop: 8, fontStyle: 'italic' }}>"{item.quote}"</Text>
+                <View style={{ flexDirection: 'row', gap: 4, marginTop: 8 }}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <Ionicons key={i} name="star" size={14} color="#FACC15" />
+                  ))}
+                </View>
+              </Pressable>
+            )}
+          />
+        </Section>
+
+        {/* CTA */}
+        <Section>
+          <View style={styles.ctaCard}>
+            <View style={{ gap: 6 }}>
+              <Text style={{ color: C.text, fontWeight: '900', fontSize: 20 }}>¿Listo para elevar tu arte?</Text>
+              <Text style={{ color: C.muted }}>
+                Descubrí nuestra colección de insumos premium y llevá tus creaciones al siguiente nivel.
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable onPress={() => router.push('/(client)/store' as any)} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.95 }]}>
+                <Ionicons name="pricetags-outline" size={18} color="#fff" />
+                <Text style={styles.primaryText}>Explorar productos</Text>
+              </Pressable>
+              <Pressable onPress={() => router.push('/(client)/about' as any)} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
+                <Ionicons name="chatbubbles-outline" size={18} color="#C4B5FD" />
+                <Text style={styles.ghostText}>Contacto</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Section>
+
+        {/* Redes */}
+        <Section>
+          <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 18 }}>
+            <Pressable onPress={openInstagram} style={({ pressed }) => [styles.socialBtn, pressed && { opacity: 0.95 }]}>
+              <View style={styles.socialIconWrap}>
+                <Ionicons name="logo-instagram" size={20} color="#C4B5FD" />
+              </View>
+              <Text style={{ color: C.text }}>Instagram</Text>
+            </Pressable>
+            <Pressable onPress={openWhatsApp} style={({ pressed }) => [styles.socialBtn, pressed && { opacity: 0.95 }]}>
+              <View style={styles.socialIconWrap}>
+                <Ionicons name="logo-whatsapp" size={20} color="#C4B5FD" />
+              </View>
+              <Text style={{ color: C.text }}>WhatsApp</Text>
+            </Pressable>
+            <Pressable onPress={() => openURL('mailto:contacto@universotattoo.com.ar')} style={({ pressed }) => [styles.socialBtn, pressed && { opacity: 0.95 }]}>
+              <View style={styles.socialIconWrap}>
+                <Ionicons name="mail-outline" size={20} color="#C4B5FD" />
+              </View>
+              <Text style={{ color: C.text }}>Email</Text>
+            </Pressable>
+          </View>
+        </Section>
+      </ScrollView>
+    </RNSafeAreaView>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Section({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <View style={{ backgroundColor: '#11151B', borderColor: C.border, borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
-      <Text style={{ color: '#A78BFA', fontWeight: '800', textAlign: 'center' }}>{value}</Text>
-      <Text style={{ color: C.muted, fontSize: 12, textAlign: 'center' }}>{label}</Text>
+    <View style={{ paddingHorizontal: 16, paddingTop: 16, gap: 10 }}>
+      {!!title && <Text style={{ color: C.text, fontSize: 20, fontWeight: '900' }}>{title}</Text>}
+      {!!subtitle && <Text style={{ color: C.muted }}>{subtitle}</Text>}
+      {children}
     </View>
   );
 }
 
-function Chip({ label, active, onPress }: { label: string; active?: boolean; onPress?: () => void }) {
+function Pill({ icon, label }: { icon: keyof typeof Ionicons.glyphMap; label: string }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 999,
-        borderWidth: 1,
-        borderColor: active ? 'rgba(124,58,237,0.6)' : C.border,
-        backgroundColor: active ? C.primarySoft : '#11151B',
-      }}
-    >
-      <Text style={{ color: active ? C.text : C.muted, fontWeight: active ? '800' : '600' }}>{label}</Text>
-    </Pressable>
+    <View style={styles.pill}>
+      <Ionicons name={icon} size={14} color="#A78BFA" />
+      <Text style={{ color: '#E5E7EB', fontSize: 12, fontWeight: '700' }}>{label}</Text>
+    </View>
   );
 }
 
-function SegBtn({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[
-        {
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 10,
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: C.border,
-          backgroundColor: '#11151B',
-        },
-        active && { backgroundColor: C.primarySoft, borderColor: 'rgba(124,58,237,0.5)' },
-      ]}
-    >
-      <Text style={{ color: active ? C.text : C.muted, fontWeight: active ? '800' : '600' }}>{label}</Text>
-    </Pressable>
-  );
+// Acepta arrays readonly para evitar el error de asignabilidad
+function chunk<T>(arr: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size) as T[]);
+  return out;
 }
 
 function toCurrency(n: number) {
@@ -526,103 +435,125 @@ function toCurrency(n: number) {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  glowBlob: {
+    position: 'absolute',
+    top: '18%',
+    left: '30%',
+    width: 240,
+    height: 240,
+    borderRadius: 9999,
+    filter: 'blur(40px)' as any,
+    opacity: 0.3,
+  },
 
-  input: {
-    minHeight: 44,
+  heroTitle: { color: C.text, fontSize: 26, fontWeight: '900', lineHeight: 32 },
+  heroSubtitle: { color: C.muted },
+
+  primaryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: C.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.35)',
+  },
+  primaryText: { color: '#fff', fontWeight: '800' },
+
+  ghostBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: C.card,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: C.border,
-    backgroundColor: '#11151B',
-    paddingHorizontal: 12,
-    color: C.text,
   },
+  ghostText: { color: '#E5E7EB', fontWeight: '700' },
 
-  // Botón Heart en header
-  iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#11151B',
-    borderWidth: 1,
-    borderColor: C.border,
+  pill: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
 
-  // Card rectangular ancho completo
-  cardRect: {
+  videoWrap: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.35)',
+    backgroundColor: '#000',
+  },
+
+  categoryCard: {
+    flex: 1,
+    height: 150,
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: C.card,
     borderWidth: 1,
-    borderColor: C.border,
-  },
-
-  // Caja de imagen uniforme (no se corta)
-  imageBox: {
-    height: IMAGE_HEIGHT,
+    borderColor: 'rgba(124,58,237,0.35)',
     backgroundColor: '#0B0F14',
-    borderBottomWidth: 1,
-    borderColor: C.border,
-    position: 'relative',
   },
-  image: { width: '100%', height: '100%' },
-  imageOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.25)' },
+  categoryImg: { width: '100%', height: '100%' },
+  categoryInfo: { position: 'absolute', bottom: 10, left: 10, right: 10 },
+  categoryTitle: { color: '#fff', fontWeight: '900', fontSize: 18 },
 
-  // Badges e iconos sobre la imagen
-  badge: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  badgeText: { fontSize: 11, fontWeight: '800', color: '#1F2937' },
-
-  overlayActions: { position: 'absolute', top: 8, right: 8, flexDirection: 'row', gap: 6 },
-  overlayBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 999,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Contenido con layout consistente
-  content: { padding: 12, justifyContent: 'space-between', flex: 1, gap: 10 },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-
-  catPill: {
-    color: '#A78BFA',
-    backgroundColor: C.primarySoft,
+  card: {
+    backgroundColor: C.card,
     borderColor: C.border,
     borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    fontSize: 12,
-    fontWeight: '800',
-    maxWidth: '65%',
+    borderRadius: 12,
+    padding: 10,
+  },
+  productImg: { width: '100%', height: 160, borderRadius: 8, backgroundColor: '#0B0F14' },
+
+  // Estilo faltante para el botón "Ver detalles"
+  smallBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: C.primary,
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.35)',
   },
 
-  stockText: { fontSize: 12, fontWeight: '800' },
-  stockGreen: { color: '#34D399' },
-  stockAmber: { color: '#F59E0B' },
-  stockRed: { color: '#FCA5A5' },
+  testimonialCard: {
+    width: 280,
+    backgroundColor: 'rgba(20,24,33,0.9)',
+    borderColor: C.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+  },
 
-  title: { color: C.text, fontWeight: '800', fontSize: 15 },
+  ctaCard: {
+    backgroundColor: 'rgba(124,58,237,0.08)',
+    borderColor: 'rgba(124,58,237,0.35)',
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+  },
 
-  footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  price: { color: '#C4B5FD', fontWeight: '900', fontSize: 18 },
-
-  ctaIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+  socialBtn: { alignItems: 'center', gap: 6 },
+  socialIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    backgroundColor: 'rgba(124,58,237,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(124,58,237,0.35)',
   },
 });

@@ -5,12 +5,12 @@ import {
   ActivityIndicator,
   Image,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View
 } from 'react-native';
+import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
 import { Button } from '../../../components/ui/Button';
@@ -51,8 +51,6 @@ type ProductVM = {
   stock_total: number;
   sku: string | null;
   peso: number | null;
-  marca: string | null;
-  material: string | null;
   categoria: { id_categoria: number | null; nombre: string };
   imagenes: Array<{
     id_imagen: number;
@@ -98,17 +96,18 @@ export default function ProductDetailScreen() {
   );
 
   const currentPrice = useMemo(() => {
-    // Igual que en web: si hay variante seleccionada y tiene precio_adicional > 0, reemplaza el base
     if (currentVariant && Number(currentVariant.precio_adicional) > 0) return Number(currentVariant.precio_adicional);
     return Number(product?.precio_base ?? 0);
   }, [product?.precio_base, currentVariant]);
 
   const currentStock = useMemo(() => {
-    if (currentVariant) return Number(currentVariant.stock ?? 0);
+    if (variants.length > 0) {
+      if (currentVariant) return Number(currentVariant.stock ?? 0);
+      return variants.reduce((acc, v) => acc + Number(v.stock ?? 0), 0);
+    }
     return Number(product?.stock_total ?? 0);
-  }, [product?.stock_total, currentVariant]);
+  }, [product?.stock_total, currentVariant, variants]);
 
-  // Mantener quantity dentro del stock actual
   useEffect(() => {
     if (quantity > currentStock) setQuantity(Math.max(1, currentStock));
   }, [currentStock, quantity]);
@@ -197,16 +196,15 @@ export default function ProductDetailScreen() {
     if (!pid) return;
     setLoading(true);
     try {
-      // Sesión para favoritos
       const { data: sess } = await supabase.auth.getSession();
       const uid = sess.session?.user?.id ?? null;
       setUserId(uid ?? null);
 
-      // Producto con imágenes y categoría
+      // SIN 'material'
       const { data: prod, error: prodErr } = await supabase
         .from('Producto')
         .select(
-          'id_producto,nombre,descripcion,precio_base,stock_total,sku,peso,marca,material,categoriaId,ProductoImagen(id_imagen,url_imagen,es_principal,orden),Categoria(id_categoria,nombre)'
+          'id_producto,nombre,descripcion,precio_base,stock_total,sku,peso,categoriaId,ProductoImagen(id_imagen,url_imagen,es_principal,orden),Categoria(id_categoria,nombre)'
         )
         .eq('id_producto', pid)
         .maybeSingle();
@@ -223,21 +221,19 @@ export default function ProductDetailScreen() {
       };
 
       const vm: ProductVM = {
-        id_producto: p.id_producto,
-        nombre: p.nombre,
-        descripcion: p.descripcion,
-        precio_base: Number(p.precio_base ?? 0),
-        stock_total: Number(p.stock_total ?? 0),
-        sku: p.sku ?? null,
-        peso: p.peso ?? null,
-        marca: p.marca ?? null,
-        material: p.material ?? null,
+        id_producto: (p as any).id_producto,
+        nombre: (p as any).nombre,
+        descripcion: (p as any).descripcion,
+        precio_base: Number((p as any).precio_base ?? 0),
+        stock_total: Number((p as any).stock_total ?? 0),
+        sku: (p as any).sku ?? null,
+        peso: (p as any).peso ?? null,
         categoria: {
           id_categoria: (p as any).Categoria?.id_categoria ?? (p as any).categoriaId ?? null,
           nombre: (p as any).Categoria?.nombre ?? 'Sin categoría',
         },
-        imagenes: Array.isArray(p.ProductoImagen)
-          ? p.ProductoImagen.map((im) => ({
+        imagenes: Array.isArray((p as any).ProductoImagen)
+          ? (p as any).ProductoImagen.map((im: any) => ({
               id_imagen: im.id_imagen,
               url_imagen: im.url_imagen,
               es_principal: !!im.es_principal,
@@ -247,7 +243,6 @@ export default function ProductDetailScreen() {
       };
       setProduct(vm);
 
-      // Variantes activas (alias para "tamaño" -> tamano) y preselección de la más barata con stock
       const { data: vars, error: varErr } = await supabase
         .from('ProductoVariante')
         .select(`
@@ -265,7 +260,8 @@ export default function ProductDetailScreen() {
           tamano:"tamaño",
           tipo_producto,
           configuracion_aguja,
-          numero_agujas
+          numero_agujas,
+          es_activa
         `)
         .eq('producto_id', pid)
         .eq('es_activa', true)
@@ -279,7 +275,6 @@ export default function ProductDetailScreen() {
       }));
       setVariants(mappedVars);
 
-      // Preseleccionar automáticamente la variante más barata con stock (como en web)
       if (mappedVars.length > 0) {
         const inStock = mappedVars.filter((v) => Number(v.stock ?? 0) > 0);
         if (inStock.length > 0) {
@@ -294,6 +289,7 @@ export default function ProductDetailScreen() {
     } catch (e: any) {
       console.warn('[product-detail] error:', e?.message ?? e);
       Toast.show({ type: 'error', text1: 'No se pudo cargar el producto' });
+      setProduct(null);
     } finally {
       setLoading(false);
     }
@@ -335,6 +331,12 @@ export default function ProductDetailScreen() {
       cantidad: quantity,
       quantity: quantity,
       varianteId: currentVariant?.id_variante ?? null,
+      variantId: currentVariant?.id_variante ?? null,
+      variantName: currentVariant
+        ? [currentVariant.configuracion_aguja, currentVariant.numero_agujas, currentVariant.color, currentVariant.volumen, currentVariant.grosor, currentVariant.marca_cartucho, currentVariant.compatibilidad, currentVariant.material_variante, currentVariant.tono_color, currentVariant.tamaño, currentVariant.tipo_producto]
+            .filter(Boolean)
+            .join(' • ')
+        : null,
     } as any);
 
     Toast.show({ type: 'success', text1: 'Agregado al carrito' });
@@ -346,18 +348,18 @@ export default function ProductDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top','right','bottom','left']}>
         <View style={styles.center}>
           <ActivityIndicator color={C.primary} size="large" />
           <Text style={{ color: C.muted, marginTop: 8 }}>Cargando producto…</Text>
         </View>
-      </SafeAreaView>
+      </RNSafeAreaView>
     );
   }
 
   if (!product) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top','right','bottom','left']}>
         <View style={styles.center}>
           <Ionicons name="alert-circle-outline" size={28} color={C.muted} />
           <Text style={{ color: C.muted, marginTop: 6 }}>Producto no encontrado</Text>
@@ -365,12 +367,12 @@ export default function ProductDetailScreen() {
             <Button title="Volver" onPress={() => router.back()} />
           </View>
         </View>
-      </SafeAreaView>
+      </RNSafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+    <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top','right','bottom','left']}>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 24 }}>
         {/* Header actions */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -591,10 +593,8 @@ export default function ProductDetailScreen() {
             <Detail label="Soporte" value="Atención al cliente 24/7" />
           </View>
         </Card>
-
-        {/* (Opcional) Productos relacionados: podés agregar más adelante con una FlatList */}
       </ScrollView>
-    </SafeAreaView>
+    </RNSafeAreaView>
   );
 }
 
