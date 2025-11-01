@@ -77,11 +77,15 @@ export default function ClientLayout() {
   // - Tienda (/(client)/store)
   // - Perfil (incluye sección de Favoritos dentro)
   // - Sobre nosotros
+  // - Contacto
+  // Nota: devoluciones, envios, preguntas-frecuentes y terminos-y-condiciones
+  // no aparecen en el menú pero son accesibles via navegación directa
   const items = [
     { label: 'Inicio', href: '/(client)', icon: { name: 'home-outline' } },
     { label: 'Tienda', href: '/(client)/store', icon: { name: 'storefront-outline' } },
     { label: 'Perfil', href: '/(client)/profile', icon: { name: 'person-outline' } },
     { label: 'Sobre nosotros', href: '/(client)/about', icon: { name: 'information-circle-outline' } },
+    { label: 'Contacto', href: '/(client)/contact', icon: { name: 'mail-outline' } },
   ];
 
   const handleLogout = async () => {
@@ -114,7 +118,15 @@ export default function ClientLayout() {
 
         <Stack.Screen name="cart" options={{ title: 'Carrito' }} />
         <Stack.Screen name="profile" options={{ title: 'Perfil' }} />
+        
+        {/* Pantallas informativas (no aparecen en menú hamburguesa, accesibles por navegación) */}
         <Stack.Screen name="about" options={{ title: 'Sobre nosotros' }} />
+        <Stack.Screen name="contact" options={{ title: 'Contacto' }} />
+        <Stack.Screen name="devoluciones" options={{ title: 'Devoluciones' }} />
+        <Stack.Screen name="envios" options={{ title: 'Envíos' }} />
+        <Stack.Screen name="preguntas-frecuentes" options={{ title: 'Preguntas Frecuentes' }} />
+        <Stack.Screen name="terminos-y-condiciones" options={{ title: 'Términos y Condiciones' }} />
+        
         <Stack.Screen name="product/[id]" options={{ title: 'Producto' }} />
         <Stack.Screen name="checkout" options={{ title: 'Finalizar compra' }} />
       </Stack>

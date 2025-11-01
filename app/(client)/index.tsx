@@ -3,21 +3,21 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-    Animated,
-    FlatList,
-    Image,
-    Linking,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    View,
-    useWindowDimensions
+  Animated,
+  FlatList,
+  Image,
+  Linking,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  useWindowDimensions
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
-import { API_BASE, apiGet } from '../../lib/api';
+import { API_BASE } from '../../lib/api';
 
 const C = {
   bg: '#0E1116',
@@ -32,26 +32,62 @@ const C = {
   info: '#60A5FA',
 };
 
-type ProductoDestacado = {
-  id: number;
-  nombre: string;
-  descripcion: string;
-  precio: number;
-  stock: number;
-  sku?: string | null;
-  categoria: { id: number; nombre: string } | null;
-  imagen: string | null;
-  alt_text?: string | null;
-};
-
 type Category = { name: string; image: string; link: string };
 
-// Prefijo para imágenes que en web están en /img/...
-function img(src: string) {
-  if (/^https?:\/\//i.test(src)) return src;
+// Mapeo de imágenes locales con require directo
+const localImages: { [key: string]: any } = {
+  'img/maquinas.webp': require('../../assets/images/maquinas.webp'),
+  'img/agujas.webp': require('../../assets/images/agujas.webp'),
+  'img/tintas.webp': require('../../assets/images/tintas.webp'),
+  'img/accesorios.webp': require('../../assets/images/accesorios.webp'),
+  'img/bink.webp': require('../../assets/images/bink.webp'),
+  'img/ariel-baldessari.webp': require('../../assets/images/ariel-baldessari.webp'),
+  'img/amaitattoo.webp': require('../../assets/images/amaitattoo.webp'),
+  '/img/maquinas.webp': require('../../assets/images/maquinas.webp'),
+  '/img/agujas.webp': require('../../assets/images/agujas.webp'),
+  '/img/tintas.webp': require('../../assets/images/tintas.webp'),
+  '/img/accesorios.webp': require('../../assets/images/accesorios.webp'),
+  '/img/bink.webp': require('../../assets/images/bink.webp'),
+  '/img/ariel-baldessari.webp': require('../../assets/images/ariel-baldessari.webp'),
+  '/img/amaitattoo.webp': require('../../assets/images/amaitattoo.webp'),
+};
+
+console.log('📦 [index] Imágenes locales cargadas:', Object.keys(localImages));
+
+// Función para cargar imágenes (locales primero, servidor como fallback)
+function img(src: string): any {
+  console.log('🖼️ [img] Solicitando:', src);
+  
+  if (/^https?:\/\//i.test(src)) {
+    console.log('✅ [img] URL absoluta, retornando:', { uri: src });
+    return { uri: src };
+  }
+  
+  const cleanPath = src.replace(/^\//, '');
+  const withSlash = `/${cleanPath}`;
+  
+  console.log('🔍 [img] Buscando en local:', { cleanPath, withSlash });
+  
+  // Buscar en assets locales (con o sin slash inicial)
+  // IMPORTANTE: require() ya retorna el asset source correcto para React Native
+  if (localImages[cleanPath]) {
+    const asset = localImages[cleanPath];
+    console.log('✅ [img] Encontrado en local (cleanPath):', cleanPath, 'asset:', asset);
+    return asset; // Retornar directamente el require()
+  }
+  if (localImages[withSlash]) {
+    const asset = localImages[withSlash];
+    console.log('✅ [img] Encontrado en local (withSlash):', withSlash, 'asset:', asset);
+    return asset; // Retornar directamente el require()
+  }
+  
+  // Fallback al servidor
   const base = (API_BASE || '').replace(/\/+$/, '');
-  return `${base}${src.startsWith('/') ? '' : '/'}${src}`;
+  const serverUrl = `${base}/${cleanPath}`;
+  console.log('⚠️ [img] No encontrado local, usando servidor:', serverUrl);
+  return { uri: serverUrl };
 }
+
 
 // CATEGORIES como array mutable tipado, para evitar readonly y unknown
 const CATEGORIES: Category[] = [
@@ -94,9 +130,6 @@ export default function ClientHome() {
 
   const [refreshing, setRefreshing] = useState(false);
 
-  const [featured, setFeatured] = useState<ProductoDestacado[]>([]);
-  const [loadingFeatured, setLoadingFeatured] = useState(true);
-
   const glow = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     Animated.loop(
@@ -110,30 +143,9 @@ export default function ClientHome() {
   const glowScale = glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
   const glowOpacity = glow.interpolate({ inputRange: [0, 1], outputRange: [0.25, 0.5] });
 
-  async function loadFeaturedProducts(retry = 0) {
-    try {
-      setLoadingFeatured(true);
-      const data = await apiGet<{ productos: ProductoDestacado[] }>(
-        '/api/productos/destacados',
-        { limit: 8 },
-        { headers: { 'Cache-Control': 'no-cache' } }
-      );
-      setFeatured(Array.isArray(data?.productos) ? data.productos : []);
-    } catch {
-      if (retry < 2) setTimeout(() => loadFeaturedProducts(retry + 1), 800 * (retry + 1));
-      else setFeatured([]);
-    } finally {
-      setLoadingFeatured(false);
-    }
-  }
-
-  useEffect(() => {
-    loadFeaturedProducts();
-  }, []);
-
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadFeaturedProducts();
+    // Aquí podrías recargar otros datos si es necesario en el futuro
     setRefreshing(false);
   };
 
@@ -236,7 +248,7 @@ export default function ClientHome() {
                     onPress={() => router.push(cat.link as any)}
                     style={({ pressed }) => [styles.categoryCard, pressed && { opacity: 0.95 }]}
                   >
-                    <Image source={{ uri: img(cat.image) }} style={styles.categoryImg} resizeMode="cover" />
+                    <Image source={img(cat.image)} style={styles.categoryImg} resizeMode="cover" />
                     <LinearGradient
                       colors={['rgba(0,0,0,0.75)', 'transparent']}
                       start={{ x: 0.5, y: 1 }}
@@ -257,71 +269,6 @@ export default function ClientHome() {
           </View>
         </Section>
 
-        {/* Destacados */}
-        <Section title="Productos destacados" subtitle="Nuestra selección de los mejores insumos">
-          {loadingFeatured ? (
-            <View style={{ gap: 10 }}>
-              {Array.from({ length: 6 }).map((_, i) => (
-                <View key={`sk-${i}`} style={styles.card}>
-                  <View style={{ height: 160, backgroundColor: '#1A1F2A', borderRadius: 10 }} />
-                  <View style={{ height: 12 }} />
-                  <View style={{ height: 16, backgroundColor: '#1A1F2A', borderRadius: 6, width: '55%' }} />
-                  <View style={{ height: 8 }} />
-                  <View style={{ height: 12, backgroundColor: '#1A1F2A', borderRadius: 6, width: '80%' }} />
-                </View>
-              ))}
-            </View>
-          ) : featured.length > 0 ? (
-            <View style={{ gap: 10 }}>
-              {featured.map((p) => (
-                <View key={p.id} style={styles.card}>
-                  <Image
-                    source={{ uri: p.imagen || img('/placeholder.svg') }}
-                    style={styles.productImg}
-                    resizeMode="cover"
-                  />
-                  <View style={{ padding: 10, gap: 6 }}>
-                    <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }} numberOfLines={2}>
-                      {p.nombre}
-                    </Text>
-                    {!!p.descripcion && (
-                      <Text style={{ color: C.muted }} numberOfLines={2}>
-                        {p.descripcion}
-                      </Text>
-                    )}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ color: '#C4B5FD', fontWeight: '900', fontSize: 18 }}>{toCurrency(p.precio)}</Text>
-                      <Pressable
-                        onPress={() => router.push(`/(client)/product/${p.id}` as any)}
-                        style={({ pressed }) => [styles.smallBtn, pressed && { opacity: 0.95 }]}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '800' }}>Ver detalles</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-              ))}
-              <Pressable
-                onPress={() => router.push('/(client)/store' as any)}
-                style={({ pressed }) => [styles.ghostBtn, { alignSelf: 'center', marginTop: 6 }, pressed && { opacity: 0.95 }]}
-              >
-                <Ionicons name="arrow-forward" size={16} color="#C4B5FD" />
-                <Text style={styles.ghostText}>Ver todos los productos</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <View style={[styles.card, { alignItems: 'center' }]}>
-              <Text style={{ color: C.muted, marginBottom: 10 }}>
-                No hay productos destacados disponibles en este momento
-              </Text>
-              <Pressable onPress={() => loadFeaturedProducts()} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
-                <Ionicons name="refresh" size={16} color="#C4B5FD" />
-                <Text style={styles.ghostText}>Recargar</Text>
-              </Pressable>
-            </View>
-          )}
-        </Section>
-
         {/* Testimonios */}
         <Section title="Lo que dicen nuestros clientes" subtitle="Profesionales que confían en Universo Tattoo">
           <FlatList
@@ -333,7 +280,7 @@ export default function ClientHome() {
             renderItem={({ item }) => (
               <Pressable onPress={() => openURL(item.instagram)} style={({ pressed }) => [styles.testimonialCard, pressed && { opacity: 0.95 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <Image source={{ uri: img(item.image) }} style={{ width: 48, height: 48, borderRadius: 999 }} />
+                  <Image source={img(item.image)} style={{ width: 48, height: 48, borderRadius: 999 }} />
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: C.text, fontWeight: '800' }}>{item.name}</Text>
                     <Text style={{ color: '#A78BFA', fontSize: 12 }}>{item.role}</Text>
@@ -364,7 +311,7 @@ export default function ClientHome() {
                 <Ionicons name="pricetags-outline" size={18} color="#fff" />
                 <Text style={styles.primaryText}>Explorar productos</Text>
               </Pressable>
-              <Pressable onPress={() => router.push('/(client)/about' as any)} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
+              <Pressable onPress={() => router.push('/(client)/contact' as any)} style={({ pressed }) => [styles.ghostBtn, pressed && { opacity: 0.95 }]}>
                 <Ionicons name="chatbubbles-outline" size={18} color="#C4B5FD" />
                 <Text style={styles.ghostText}>Contacto</Text>
               </Pressable>
