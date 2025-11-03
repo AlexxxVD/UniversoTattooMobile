@@ -23,8 +23,8 @@ export function Screen({ children, scroll = true, contentStyle, safeTop = true }
         end={{ x: 1, y: 1 }}
         style={{ position: 'absolute', inset: 0 }}
       />
-      <SafeAreaView style={{ flex: 1 }}>
-        <Content contentContainerStyle={[{ padding: 16 }, contentStyle]} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }} edges={safeTop ? ['right', 'bottom', 'left'] : ['right', 'bottom', 'left']}>
+        <Content contentContainerStyle={[{ paddingHorizontal: 16, paddingBottom: 16 }, contentStyle]} style={{ flex: 1 }}>
           {children}
         </Content>
       </SafeAreaView>

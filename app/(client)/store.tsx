@@ -67,6 +67,10 @@ export default function ShopScreen() {
   const [minPrice, setMinPrice] = useState<number | ''>('');
   const [maxPrice, setMaxPrice] = useState<number | ''>('');
   const [sort, setSort] = useState<'price-asc' | 'price-desc' | 'name-asc'>('price-asc');
+  
+  // Paginación
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Lee y normaliza ?categoria=... del querystring
   const desiredCategoryFromUrl = useMemo(() => {
@@ -84,10 +88,12 @@ export default function ShopScreen() {
   useEffect(() => {
     if (desiredCategoryFromUrl && desiredCategoryFromUrl !== categoryFilter) {
       setCategoryFilter(desiredCategoryFromUrl);
+      setCurrentPage(1); // Reset página al cambiar categoría
     }
     // Si viene "Todos" en la URL (poco probable), lo soportamos también
     if (desiredCategoryFromUrl === 'Todos' && categoryFilter !== 'Todos') {
       setCategoryFilter('Todos');
+      setCurrentPage(1); // Reset página
     }
   }, [desiredCategoryFromUrl]);
 
@@ -231,6 +237,20 @@ export default function ShopScreen() {
     return arr;
   }, [items, search, categoryFilter, minPrice, maxPrice, sort]);
 
+  // Productos paginados
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return filtered.slice(startIndex, endIndex);
+  }, [filtered, currentPage, ITEMS_PER_PAGE]);
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+
+  // Reset página cuando cambian los filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, categoryFilter, minPrice, maxPrice, sort]);
+
   const requireAuth = useCallback(async () => {
     // Refresca sesión por si caducó
     const { data } = await supabase.auth.getSession();
@@ -322,12 +342,14 @@ export default function ShopScreen() {
   const handleCategoryPress = useCallback(
     (name: 'Todos' | string) => {
       setCategoryFilter(name);
-      // Actualizamos la URL de la misma pantalla (opcional, pero útil para deep-link)
+      setCurrentPage(1); // Reset página al cambiar categoría
+      // Actualizamos solo los parámetros de la URL sin reemplazar la pantalla completa
       try {
-        router.replace({
-          pathname: '/(client)/store',
-          params: name === 'Todos' ? {} : { categoria: encodeURIComponent(name) },
-        } as any);
+        if (name === 'Todos') {
+          router.setParams({ categoria: undefined } as any);
+        } else {
+          router.setParams({ categoria: name } as any);
+        }
       } catch {
         // silent
       }
@@ -337,14 +359,14 @@ export default function ShopScreen() {
 
   const header = (
     <View style={{ gap: 12 }}>
-      {/* Título + acceso a Favoritos (si ya migraste favoritos al perfil, cambiá la ruta aquí) */}
+      {/* Título + acceso a Favoritos en perfil */}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View>
           <Text style={{ color: '#C4B5FD', fontWeight: '900', fontSize: 22 }}>Tienda</Text>
           <Text style={{ color: C.muted, marginTop: 2 }}>Descubrí nuestra selección</Text>
         </View>
         <Pressable
-          onPress={() => router.push('/(client)/favorites' as any)}
+          onPress={() => router.push({ pathname: '/(client)/profile', params: { tab: 'favorites' } } as any)}
           style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
           hitSlop={8}
         >
@@ -358,6 +380,39 @@ export default function ShopScreen() {
         <Stat label="Mostrados" value={String(filtered.length)} />
         <Stat label="Categorías" value={String(categorias.length)} />
       </View>
+
+      {/* Paginación */}
+      {filtered.length > ITEMS_PER_PAGE && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+          <Pressable
+            onPress={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            style={({ pressed }) => [
+              styles.pageBtn,
+              currentPage === 1 && styles.pageBtnDisabled,
+              pressed && { opacity: 0.7 }
+            ]}
+          >
+            <Ionicons name="chevron-back" size={18} color={currentPage === 1 ? C.muted : C.text} />
+          </Pressable>
+          
+          <Text style={{ color: C.text, fontWeight: '700' }}>
+            Página {currentPage} de {totalPages}
+          </Text>
+          
+          <Pressable
+            onPress={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            style={({ pressed }) => [
+              styles.pageBtn,
+              currentPage === totalPages && styles.pageBtnDisabled,
+              pressed && { opacity: 0.7 }
+            ]}
+          >
+            <Ionicons name="chevron-forward" size={18} color={currentPage === totalPages ? C.muted : C.text} />
+          </Pressable>
+        </View>
+      )}
 
       {/* Filtros básicos */}
       <View style={{ gap: 8 }}>
@@ -511,7 +566,7 @@ export default function ShopScreen() {
   return (
     <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
       <FlatList
-        data={filtered}
+        data={paginatedProducts}
         keyExtractor={(p) => String(p.id_producto)}
         renderItem={renderItem}
         // UNA SOLA COLUMNA → rectángulos anchos apilados (como tu dibujo)
@@ -523,6 +578,44 @@ export default function ShopScreen() {
             <Ionicons name="cube-outline" size={36} color={C.muted} />
             <Text style={{ color: C.muted }}>No hay productos para mostrar.</Text>
           </View>
+        }
+        ListFooterComponent={
+          filtered.length > ITEMS_PER_PAGE ? (
+            <View style={{ paddingVertical: 20, alignItems: 'center', gap: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <Pressable
+                  onPress={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  style={({ pressed }) => [
+                    styles.pageBtn,
+                    currentPage === 1 && styles.pageBtnDisabled,
+                    pressed && { opacity: 0.7 }
+                  ]}
+                >
+                  <Ionicons name="chevron-back" size={18} color={currentPage === 1 ? C.muted : C.text} />
+                </Pressable>
+                
+                <Text style={{ color: C.text, fontWeight: '700' }}>
+                  Página {currentPage} de {totalPages}
+                </Text>
+                
+                <Pressable
+                  onPress={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  style={({ pressed }) => [
+                    styles.pageBtn,
+                    currentPage === totalPages && styles.pageBtnDisabled,
+                    pressed && { opacity: 0.7 }
+                  ]}
+                >
+                  <Ionicons name="chevron-forward" size={18} color={currentPage === totalPages ? C.muted : C.text} />
+                </Pressable>
+              </View>
+              <Text style={{ color: C.muted, fontSize: 12 }}>
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1} - {Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} de {filtered.length}
+              </Text>
+            </View>
+          ) : null
         }
       />
     </RNSafeAreaView>
@@ -686,5 +779,20 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+
+  // Paginación
+  pageBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#11151B',
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pageBtnDisabled: {
+    opacity: 0.4,
   },
 });

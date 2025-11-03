@@ -2,14 +2,14 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -297,7 +297,7 @@ export default function ProductsScreen() {
 
   if (checkingAuth) {
     return (
-      <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
+      <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.primary} />
           <Text style={{ color: C.muted, marginTop: 8 }}>Verificando permisos...</Text>
@@ -307,11 +307,11 @@ export default function ProductsScreen() {
   }
 
   if (!isAdmin) {
-    return <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']} />;
+    return <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']} />;
   }
 
   return (
-    <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
+    <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
       {loading ? (
         <View style={[styles.center, { padding: 16 }]}>
           <ActivityIndicator size="large" color={C.primary} />

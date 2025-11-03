@@ -2,16 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  RefreshControl,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
 import { Tables } from '../../lib/database.types';
@@ -158,7 +158,7 @@ export default function OrdersScreen() {
 
   if (checkingAuth) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.primary} />
           <Text style={{ color: C.muted, marginTop: 8 }}>Verificando permisos...</Text>
@@ -168,11 +168,11 @@ export default function OrdersScreen() {
   }
 
   if (!isAdmin) {
-    return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} />;
+    return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']} />;
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
       {loading ? (
         <View style={[styles.center, { padding: 16 }]}>
           <ActivityIndicator size="large" color={C.primary} />

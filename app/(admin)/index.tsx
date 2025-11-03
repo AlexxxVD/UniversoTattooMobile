@@ -1,15 +1,15 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { Section } from '../../components/Section';
 import { StatCard } from '../../components/StatCard';
@@ -169,7 +169,7 @@ export default function AdminDashboard() {
   // Loading de verificación de rol
   if (checkingAuth) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.primary} />
           <Text style={{ color: C.muted, marginTop: 8 }}>Verificando permisos...</Text>
@@ -180,11 +180,11 @@ export default function AdminDashboard() {
 
   // Si no es admin, el efecto ya navegó; devolvemos un contenedor vacío por seguridad
   if (!isAdmin) {
-    return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} />;
+    return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']} />;
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}

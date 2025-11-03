@@ -91,10 +91,10 @@ function img(src: string): any {
 
 // CATEGORIES como array mutable tipado, para evitar readonly y unknown
 const CATEGORIES: Category[] = [
-  { name: 'Máquinas', image: '/img/maquinas.webp', link: '/(client)/store?categoria=Máquinas' },
-  { name: 'Agujas', image: '/img/agujas.webp', link: '/(client)/store?categoria=Agujas' },
-  { name: 'Tintas', image: '/img/tintas.webp', link: '/(client)/store?categoria=Tintas' },
-  { name: 'Accesorios', image: '/img/accesorios.webp', link: '/(client)/store?categoria=Accesorios' },
+  { name: 'Máquinas', image: '/img/maquinas.webp', link: 'Máquinas' },
+  { name: 'Agujas', image: '/img/agujas.webp', link: 'Agujas' },
+  { name: 'Tintas', image: '/img/tintas.webp', link: 'Tintas' },
+  { name: 'Accesorios', image: '/img/accesorios.webp', link: 'Accesorios' },
 ];
 
 const TESTIMONIALS = [
@@ -245,7 +245,7 @@ export default function ClientHome() {
                 {row.map((cat: Category) => (
                   <Pressable
                     key={cat.name}
-                    onPress={() => router.push(cat.link as any)}
+                    onPress={() => router.push({ pathname: '/(client)/store', params: { categoria: cat.link } } as any)}
                     style={({ pressed }) => [styles.categoryCard, pressed && { opacity: 0.95 }]}
                   >
                     <Image source={img(cat.image)} style={styles.categoryImg} resizeMode="cover" />

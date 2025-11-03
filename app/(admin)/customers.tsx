@@ -1,14 +1,14 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  View,
+    ActivityIndicator,
+    FlatList,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 import { Tables } from '../../lib/database.types';
 import { supabase } from '../../lib/supabase';
@@ -161,7 +161,7 @@ export default function CustomersScreen() {
 
   if (checkingAuth) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={C.primary} />
           <Text style={{ color: C.muted, marginTop: 8 }}>Verificando permisos...</Text>
@@ -171,11 +171,11 @@ export default function CustomersScreen() {
   }
 
   if (!isAdmin) {
-    return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} />;
+    return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']} />;
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
       {loading ? (
         <View style={[styles.center, { padding: 16 }]}>
           <ActivityIndicator size="large" color={C.primary} />

@@ -2,15 +2,24 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
-import { Screen } from '../../components/layout/Screen';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { HeaderBar } from '../../components/ui/HeaderBar';
 import { Tables } from '../../lib/database.types';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../theme';
+
+const C = {
+  bg: '#0E1116',
+  card: '#141821',
+  border: '#2A2F3A',
+  text: '#F3F4F6',
+  muted: '#A0A8B0',
+  primary: '#7C3AED',
+};
 
 type PedidoRow = Tables<'Pedido'>;
 
@@ -154,27 +163,27 @@ export default function ShipmentsScreen() {
 
   if (checkingAuth) {
     return (
-      <Screen scroll={false}>
-        <HeaderBar title="Envíos" />
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
+        <HeaderBar title="" />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <ActivityIndicator />
           <Text style={{ color: colors.textMuted, marginTop: spacing(1) }}>Verificando permisos...</Text>
         </View>
-      </Screen>
+      </SafeAreaView>
     );
   }
 
   if (!isAdmin) {
     return (
-      <Screen scroll={false}>
-        <HeaderBar title="Envíos" />
-      </Screen>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
+        <HeaderBar title="" />
+      </SafeAreaView>
     );
   }
 
   return (
-    <Screen scroll={false}>
-      <HeaderBar title="Envíos" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
+      <HeaderBar title="" />
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 16 }}>
           <ActivityIndicator />
@@ -266,6 +275,6 @@ export default function ShipmentsScreen() {
           />
         </View>
       )}
-    </Screen>
+    </SafeAreaView>
   );
 }

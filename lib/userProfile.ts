@@ -21,6 +21,8 @@ export async function ensureUserRow(opts: EnsureOptions = {}): Promise<boolean> 
   const firstName = (meta.firstName || meta.name || '').toString().trim();
   const lastName = (meta.lastName || '').toString().trim();
   const fullName = [firstName, lastName].filter(Boolean).join(' ').trim() || null;
+  const phone = (meta.phone || '').toString().trim() || null;
+  const address = (meta.address || '').toString().trim() || null;
 
  
   const existing = await supabase
@@ -79,6 +81,31 @@ export async function ensureUserRow(opts: EnsureOptions = {}): Promise<boolean> 
       });
       return false;
     }
+  }
+
+  // Crear registro en Cliente también
+  try {
+    const clientePayload: any = {
+      userId: u.id,
+      nombre: firstName || null,
+      apellido: lastName || null,
+      email: u.email,
+      telefono: phone,
+      calle: address,
+      acepta_marketing: false,
+    };
+
+    const { error: clienteError } = await supabase
+      .from('Cliente')
+      .insert(clientePayload);
+
+    if (clienteError) {
+      console.warn('[ensureUserRow] Error creando Cliente:', clienteError);
+    } else {
+      console.log('[ensureUserRow] Cliente creado exitosamente');
+    }
+  } catch (e: any) {
+    console.warn('[ensureUserRow] Exception al crear Cliente:', e?.message);
   }
 
   return true;

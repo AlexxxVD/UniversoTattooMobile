@@ -2,20 +2,19 @@ import { useRouter } from 'expo-router';
 import { MoreVertical, PlusCircle } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Modal,
+    Pressable,
+    RefreshControl,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
-
-import { Screen } from '../../components/layout/Screen';
 import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { ContextMenu } from '../../components/ui/ContextMenu';
@@ -23,6 +22,15 @@ import { HeaderBar } from '../../components/ui/HeaderBar';
 import { Input } from '../../components/ui/Input';
 import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../theme';
+
+const C = {
+  bg: '#0E1116',
+  card: '#141821',
+  border: '#2A2F3A',
+  text: '#F3F4F6',
+  muted: '#A0A8B0',
+  primary: '#7C3AED',
+};
 
 type Categoria = {
   id_categoria: number;
@@ -227,21 +235,21 @@ export default function CategoriesScreen() {
 
   if (checkingAuth) {
     return (
-      <Screen scroll={false}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
         <HeaderBar title="Categorías" />
         <View style={styles.centerContainer}>
           <ActivityIndicator />
           <Text style={{ color: colors.textMuted, marginTop: spacing(1) }}>Verificando permisos...</Text>
         </View>
-      </Screen>
+      </SafeAreaView>
     );
   }
   if (!isAdmin) {
-    return <Screen scroll={false}><HeaderBar title="Categorías" /></Screen>;
+    return <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}><HeaderBar title="Categorías" /></SafeAreaView>;
   }
 
   return (
-    <Screen scroll={false}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['right', 'bottom', 'left']}>
       <HeaderBar title="Categorías" />
       {loading ? (
         <View style={styles.centerContainer}>
@@ -374,7 +382,7 @@ export default function CategoriesScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-    </Screen>
+    </SafeAreaView>
   );
 }
 

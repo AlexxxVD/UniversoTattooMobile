@@ -116,7 +116,11 @@ export default function ProfileScreen() {
   }, [params?.tab]);
 
   const startEdit = useCallback(() => {
-    if (!cliente) return;
+    console.log('[profile] startEdit called, cliente:', cliente);
+    if (!cliente) {
+      Toast.show({ type: 'error', text1: 'No se pudo cargar la información del perfil' });
+      return;
+    }
     setEdit({
       nombre: cliente.nombre ?? '',
       apellido: cliente.apellido ?? '',
@@ -133,6 +137,7 @@ export default function ProfileScreen() {
       provincia: cliente.provincia ?? '',
       codigo_postal: cliente.codigo_postal ?? '',
     });
+    console.log('[profile] opening edit modal');
     setShowEdit(true);
   }, [cliente]);
 
@@ -185,6 +190,8 @@ export default function ProfileScreen() {
     try {
       const { data } = await supabase.auth.getSession();
       const uid = data.session?.user?.id ?? null;
+      console.log('[profile] loadProfile - userId:', uid);
+      
       if (!uid) {
         Toast.show({ type: 'error', text1: 'Iniciá sesión' });
         router.replace('/(auth)');
@@ -198,8 +205,55 @@ export default function ProfileScreen() {
         .eq('userId', uid)
         .maybeSingle();
 
+      console.log('[profile] loadProfile - clienteRow:', clienteRow);
+      console.log('[profile] loadProfile - error:', clienteErr);
+
       if (clienteErr) throw clienteErr;
-      setCliente((clienteRow as any) ?? null);
+      
+      if (!clienteRow) {
+        console.log('[profile] No se encontró cliente con userId:', uid);
+        // Intentar crear el registro de Cliente
+        const user = data.session?.user;
+        const meta = user?.user_metadata || {};
+        const firstName = (meta.firstName || meta.name || '').toString().trim();
+        const lastName = (meta.lastName || '').toString().trim();
+        const phone = (meta.phone || '').toString().trim() || null;
+        const address = (meta.address || '').toString().trim() || null;
+
+        const { data: newCliente, error: insertError } = await supabase
+          .from('Cliente')
+          .insert({
+            userId: uid,
+            nombre: firstName || 'Usuario',
+            apellido: lastName || 'Apellido',
+            email: user?.email || '',
+            telefono: phone,
+            calle: address,
+            acepta_marketing: false,
+          })
+          .select('*')
+          .single();
+
+        if (insertError) {
+          console.error('[profile] Error creando Cliente:', insertError);
+          Toast.show({ 
+            type: 'error', 
+            text1: 'Error al crear perfil',
+            text2: 'Por favor, contactá a soporte'
+          });
+          setCliente(null);
+        } else {
+          console.log('[profile] Cliente creado exitosamente:', newCliente);
+          Toast.show({ 
+            type: 'success', 
+            text1: 'Perfil creado',
+            text2: 'Ahora podés editar tu información'
+          });
+          setCliente((newCliente as any) ?? null);
+        }
+      } else {
+        setCliente((clienteRow as any) ?? null);
+      }
     } catch (e: any) {
       console.warn('[profile] loadProfile error:', e?.message ?? e);
       Toast.show({ type: 'error', text1: 'No se pudo cargar tu perfil' });
@@ -494,7 +548,11 @@ export default function ProfileScreen() {
                 {cliente?.telefono ? `Tel: ${cliente.telefono}` : 'Teléfono no especificado'}
               </Text>
             </View>
-            <Button title="Editar" variant="outline" onPress={startEdit} />
+            {cliente ? (
+              <Button title="Editar" variant="outline" onPress={startEdit} />
+            ) : (
+              <ActivityIndicator size="small" color={C.primary} />
+            )}
           </View>
         </Card>
 
@@ -521,7 +579,13 @@ export default function ProfileScreen() {
           <>
             <Card>
               <View style={{ padding: 14, gap: 12 }}>
-                <Text style={{ color: C.text, fontWeight: '800' }}>Tu actividad</Text>
+                <Text style={{ color: C.text, fontWeight: '800', fontSize: 18 }}>
+                  Bienvenido, {cliente?.nombre || 'Usuario'}!
+                </Text>
+                <Text style={{ color: C.muted, marginBottom: 8 }}>
+                  Aquí puedes ver un resumen de tu actividad en Universo Tattoo.
+                </Text>
+                <Text style={{ color: C.text, fontWeight: '700', marginTop: 4 }}>Tu actividad</Text>
                 <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
                   <Stat label="Pedidos totales" value={String(stats.totalOrders)} icon="bag-outline" />
                   <Stat label="Favoritos" value={loadingFavs ? '—' : String(favorites.length)} icon="heart-outline" tone="pink" />
@@ -629,48 +693,76 @@ export default function ProfileScreen() {
       {/* Edit Profile Modal */}
       <Modal visible={showEdit} transparent animationType="fade" onRequestClose={() => setShowEdit(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { width: '94%' }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }}>Editar perfil</Text>
-              <Pressable onPress={() => setShowEdit(false)} hitSlop={6}>
-                <Ionicons name="close" size={20} color={C.muted} />
+          <View style={[styles.modalCard, { width: '94%', maxHeight: '90%' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: C.border }}>
+              <View>
+                <Text style={{ color: C.text, fontWeight: '800', fontSize: 18 }}>Editar perfil</Text>
+                <Text style={{ color: C.muted, fontSize: 13, marginTop: 2 }}>Actualiza tu información personal</Text>
+              </View>
+              <Pressable onPress={() => setShowEdit(false)} hitSlop={8} style={{ padding: 4 }}>
+                <Ionicons name="close" size={24} color={C.muted} />
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={{ gap: 12, paddingTop: 8 }}>
-              <Section title="Información básica" />
-              <Row>
-                <LabeledInput label="Nombre" value={edit.nombre} onChangeText={(t) => setEdit((s) => ({ ...s, nombre: t }))} />
-                <LabeledInput label="Apellido" value={edit.apellido} onChangeText={(t) => setEdit((s) => ({ ...s, apellido: t }))} />
-              </Row>
-              <LabeledInput label="Email" keyboardType="email-address" autoCapitalize="none" value={edit.email} onChangeText={(t) => setEdit((s) => ({ ...s, email: t }))} />
-              <LabeledInput label="Teléfono" keyboardType="phone-pad" value={edit.telefono} onChangeText={(t) => setEdit((s) => ({ ...s, telefono: t }))} />
-              <LabeledInput label="Fecha de nacimiento (AAAA-MM-DD)" placeholder="1990-10-05" value={edit.fecha_nacimiento} onChangeText={(t) => setEdit((s) => ({ ...s, fecha_nacimiento: t }))} />
-              <ToggleRow label="Newsletter (acepta marketing)" value={edit.acepta_marketing} onValueChange={(v) => setEdit((s) => ({ ...s, acepta_marketing: v }))} />
+            <ScrollView contentContainerStyle={{ gap: 16, paddingTop: 16, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
+              <View style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Ionicons name="person-outline" size={20} color={C.primary} />
+                  <Section title="Información básica" />
+                </View>
+                <Row>
+                  <LabeledInput label="Nombre *" value={edit.nombre} onChangeText={(t) => setEdit((s) => ({ ...s, nombre: t }))} />
+                  <LabeledInput label="Apellido *" value={edit.apellido} onChangeText={(t) => setEdit((s) => ({ ...s, apellido: t }))} />
+                </Row>
+                <LabeledInput label="Email *" keyboardType="email-address" autoCapitalize="none" value={edit.email} onChangeText={(t) => setEdit((s) => ({ ...s, email: t }))} />
+                <LabeledInput label="Teléfono" keyboardType="phone-pad" placeholder="+54 9 11 1234-5678" value={edit.telefono} onChangeText={(t) => setEdit((s) => ({ ...s, telefono: t }))} />
+                <LabeledInput label="Fecha de nacimiento" placeholder="1990-10-05 (AAAA-MM-DD)" value={edit.fecha_nacimiento} onChangeText={(t) => setEdit((s) => ({ ...s, fecha_nacimiento: t }))} />
+                <View style={{ backgroundColor: C.card, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: C.border }}>
+                  <ToggleRow label="Newsletter (recibir ofertas y novedades)" value={edit.acepta_marketing} onValueChange={(v) => setEdit((s) => ({ ...s, acepta_marketing: v }))} />
+                </View>
+              </View>
 
-              <Section title="Documento" />
-              <LabeledInput label="DNI" value={edit.dni} onChangeText={(t) => setEdit((s) => ({ ...s, dni: t }))} />
+              <View style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Ionicons name="card-outline" size={20} color={C.primary} />
+                  <Section title="Documento de identidad" />
+                </View>
+                <LabeledInput label="DNI" placeholder="12.345.678" value={edit.dni} onChangeText={(t) => setEdit((s) => ({ ...s, dni: t }))} />
+              </View>
 
-              <Section title="Dirección" />
-              <Row>
-                <LabeledInput label="Calle" value={edit.calle} onChangeText={(t) => setEdit((s) => ({ ...s, calle: t }))} />
-                <LabeledInput label="Número" value={edit.numero} onChangeText={(t) => setEdit((s) => ({ ...s, numero: t }))} />
-              </Row>
-              <Row>
-                <LabeledInput label="Departamento (opcional)" value={edit.departamento} onChangeText={(t) => setEdit((s) => ({ ...s, departamento: t }))} />
-                <LabeledInput label="Barrio (opcional)" value={edit.barrio} onChangeText={(t) => setEdit((s) => ({ ...s, barrio: t }))} />
-              </Row>
-              <Row>
-                <LabeledInput label="Ciudad" value={edit.ciudad} onChangeText={(t) => setEdit((s) => ({ ...s, ciudad: t }))} />
-                <LabeledInput label="Provincia" value={edit.provincia} onChangeText={(t) => setEdit((s) => ({ ...s, provincia: t }))} />
-              </Row>
-              <LabeledInput label="Código postal" value={edit.codigo_postal} onChangeText={(t) => setEdit((s) => ({ ...s, codigo_postal: t }))} />
-
-              <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
-                <Button title="Cancelar" variant="outline" onPress={() => setShowEdit(false)} />
-                <Button title={savingEdit ? 'Guardando…' : 'Guardar cambios'} onPress={saveEdit} disabled={savingEdit} />
+              <View style={{ gap: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Ionicons name="location-outline" size={20} color={C.primary} />
+                  <Section title="Dirección de envío" />
+                </View>
+                <Row>
+                  <LabeledInput label="Calle" placeholder="Thames" value={edit.calle} onChangeText={(t) => setEdit((s) => ({ ...s, calle: t }))} />
+                  <LabeledInput label="Número" placeholder="2439" value={edit.numero} onChangeText={(t) => setEdit((s) => ({ ...s, numero: t }))} />
+                </Row>
+                <Row>
+                  <LabeledInput label="Departamento (opcional)" placeholder="4B" value={edit.departamento} onChangeText={(t) => setEdit((s) => ({ ...s, departamento: t }))} />
+                  <LabeledInput label="Barrio (opcional)" placeholder="Palermo" value={edit.barrio} onChangeText={(t) => setEdit((s) => ({ ...s, barrio: t }))} />
+                </Row>
+                <Row>
+                  <LabeledInput label="Ciudad" placeholder="Buenos Aires" value={edit.ciudad} onChangeText={(t) => setEdit((s) => ({ ...s, ciudad: t }))} />
+                  <LabeledInput label="Provincia" placeholder="CABA" value={edit.provincia} onChangeText={(t) => setEdit((s) => ({ ...s, provincia: t }))} />
+                </Row>
+                <LabeledInput label="Código postal" placeholder="1234" value={edit.codigo_postal} onChangeText={(t) => setEdit((s) => ({ ...s, codigo_postal: t }))} />
               </View>
             </ScrollView>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: C.border }}>
+              <View style={{ flex: 1 }}>
+                <Button title="Cancelar" variant="outline" onPress={() => setShowEdit(false)} disabled={savingEdit} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Button 
+                  title={savingEdit ? 'Guardando…' : 'Guardar cambios'} 
+                  onPress={saveEdit} 
+                  disabled={savingEdit}
+                />
+              </View>
+            </View>
           </View>
         </View>
       </Modal>
@@ -965,7 +1057,7 @@ const styles = StyleSheet.create({
 });
 
 function Section({ title }: { title: string }) {
-  return <Text style={{ color: C.text, fontWeight: '800', marginTop: 6 }}>{title}</Text>;
+  return <Text style={{ color: C.text, fontWeight: '700', fontSize: 15 }}>{title}</Text>;
 }
 
 function Row({ children }: { children: React.ReactNode }) {
@@ -1006,8 +1098,13 @@ function LabeledInput({
 function ToggleRow({ label, value, onValueChange }: { label: string; value: boolean; onValueChange: (v: boolean) => void }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Text style={{ color: C.text, fontWeight: '700' }}>{label}</Text>
-      <Switch value={value} onValueChange={onValueChange} />
+      <Text style={{ color: C.text, fontSize: 14, flex: 1, marginRight: 12 }}>{label}</Text>
+      <Switch 
+        value={value} 
+        onValueChange={onValueChange}
+        trackColor={{ false: C.border, true: C.primary }}
+        thumbColor={value ? '#fff' : '#f4f3f4'}
+      />
     </View>
   );
 }
