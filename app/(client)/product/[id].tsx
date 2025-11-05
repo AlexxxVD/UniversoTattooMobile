@@ -2,13 +2,13 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View
+    ActivityIndicator,
+    Image,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -180,12 +180,14 @@ export default function ProductDetailScreen() {
           .eq('producto_id', pid);
         if (error) throw error;
         setIsFav(false);
+        Toast.show({ type: 'info', text1: 'Eliminado de favoritos' });
       } else {
         const { error } = await supabase
           .from('Favoritos')
           .insert({ user_id: userId, producto_id: pid });
         if (error) throw error;
         setIsFav(true);
+        Toast.show({ type: 'success', text1: 'Agregado a favoritos ❤️' });
       }
     } catch (e: any) {
       Toast.show({ type: 'error', text1: 'No se pudo actualizar favoritos' });

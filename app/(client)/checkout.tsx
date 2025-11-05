@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as LinkingExpo from 'expo-linking';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -47,14 +46,106 @@ function money(n: number) {
 async function validatePostalCode(code: string): Promise<boolean> {
   return /^\d{4}$/.test(code);
 }
+
 async function getProvinceByPostalCode(code: string): Promise<string> {
   if (!/^\d{4}$/.test(code)) return 'Consultar';
   const cp = Number(code);
+  
+  // Rangos completos y ordenados de códigos postales por provincia en Argentina
+  // CABA
   if (cp >= 1000 && cp <= 1499) return 'Ciudad Autónoma de Buenos Aires';
+  
+  // Buenos Aires (múltiples rangos)
   if (cp >= 1500 && cp <= 1999) return 'Buenos Aires';
-  if (cp >= 3100 && cp <= 3399) return 'Entre Ríos';
-  if (cp >= 3400 && cp <= 3599) return 'Corrientes';
+  if (cp >= 2000 && cp <= 2199) return 'Buenos Aires';
+  if (cp >= 2700 && cp <= 2799) return 'Buenos Aires';
+  if (cp >= 2800 && cp <= 2819) return 'Buenos Aires';
+  if (cp >= 2850 && cp <= 2999) return 'Buenos Aires';
+  if (cp >= 6000 && cp <= 6999) return 'Buenos Aires';
+  if (cp >= 7000 && cp <= 7999) return 'Buenos Aires';
+  if (cp >= 8000 && cp <= 8299) return 'Buenos Aires';
+  
+  // Santa Fe
+  if (cp >= 2200 && cp <= 2299) return 'Santa Fe';
+  if (cp >= 2300 && cp <= 2399) return 'Santa Fe';
+  if (cp >= 2400 && cp <= 2499) return 'Santa Fe';
+  if (cp >= 2500 && cp <= 2599) return 'Santa Fe';
+  if (cp >= 2600 && cp <= 2699) return 'Santa Fe';
+  if (cp >= 3000 && cp <= 3099) return 'Santa Fe';
+  
+  // Entre Ríos
+  if (cp >= 2820 && cp <= 2849) return 'Entre Ríos';
+  if (cp >= 3100 && cp <= 3199) return 'Entre Ríos';
+  if (cp >= 3200 && cp <= 3299) return 'Entre Ríos';
+  
+  // Misiones
   if (cp >= 3300 && cp <= 3399) return 'Misiones';
+  
+  // Corrientes
+  if (cp >= 3400 && cp <= 3499) return 'Corrientes';
+  if (cp >= 3470 && cp <= 3479) return 'Corrientes';
+  
+  // Chaco
+  if (cp >= 3500 && cp <= 3599) return 'Chaco';
+  if (cp >= 3700 && cp <= 3799) return 'Chaco';
+  
+  // Formosa
+  if (cp >= 3600 && cp <= 3699) return 'Formosa';
+  
+  // Tucumán
+  if (cp >= 4000 && cp <= 4199) return 'Tucumán';
+  
+  // Santiago del Estero
+  if (cp >= 4200 && cp <= 4299) return 'Santiago del Estero';
+  if (cp >= 4300 && cp <= 4399) return 'Santiago del Estero';
+  
+  // Salta
+  if (cp >= 4400 && cp <= 4499) return 'Salta';
+  
+  // Jujuy
+  if (cp >= 4500 && cp <= 4699) return 'Jujuy';
+  
+  // Catamarca
+  if (cp >= 4700 && cp <= 4999) return 'Catamarca';
+  
+  // Córdoba
+  if (cp >= 5000 && cp <= 5299) return 'Córdoba';
+  
+  // La Rioja
+  if (cp >= 5300 && cp <= 5399) return 'La Rioja';
+  
+  // San Juan
+  if (cp >= 5400 && cp <= 5449) return 'San Juan';
+  
+  // Mendoza
+  if (cp >= 5500 && cp <= 5599) return 'Mendoza';
+  if (cp >= 5600 && cp <= 5699) return 'Mendoza';
+  
+  // San Luis
+  if (cp >= 5700 && cp <= 5799) return 'San Luis';
+  
+  // La Pampa
+  if (cp >= 6300 && cp <= 6399) return 'La Pampa';
+  if (cp >= 8200 && cp <= 8299) return 'La Pampa';
+  
+  // Neuquén
+  if (cp >= 8300 && cp <= 8399) return 'Neuquén';
+  
+  // Río Negro
+  if (cp >= 8400 && cp <= 8599) return 'Río Negro';
+  
+  // Chubut
+  if (cp >= 9000 && cp <= 9099) return 'Chubut';
+  if (cp >= 9100 && cp <= 9199) return 'Chubut';
+  if (cp >= 9200 && cp <= 9299) return 'Chubut';
+  
+  // Santa Cruz
+  if (cp >= 9300 && cp <= 9399) return 'Santa Cruz';
+  if (cp >= 9400 && cp <= 9499) return 'Santa Cruz';
+  
+  // Tierra del Fuego
+  if (cp >= 9410 && cp <= 9431) return 'Tierra del Fuego';
+  
   return 'Consultar';
 }
 
@@ -231,13 +322,43 @@ export default function CheckoutScreen() {
         setDbgStep('profile:load:start');
         const { data: ses } = await supabase.auth.getSession();
         const user = ses.session?.user;
+        
         if (user) {
-          setFormData((prev) => ({
-            ...prev,
-            email: prev.email || user.email || '',
-            firstName: prev.firstName || (user.user_metadata?.name?.split?.(' ')?.[0] ?? ''),
-            lastName: prev.lastName || (user.user_metadata?.name?.split?.(' ')?.slice(1).join(' ') ?? ''),
-          }));
+          // Cargar datos de la tabla Cliente
+          const { data: cliente, error: clienteError } = await supabase
+            .from('Cliente')
+            .select('*')
+            .eq('userId', user.id)
+            .maybeSingle();
+
+          if (clienteError) {
+            console.warn('[checkout] error cargando cliente:', clienteError);
+          }
+
+          if (cliente) {
+            console.log('[checkout] Datos del cliente cargados:', cliente);
+            setFormData((prev) => ({
+              ...prev,
+              email: prev.email || cliente.email || user.email || '',
+              firstName: prev.firstName || cliente.nombre || (user.user_metadata?.name?.split?.(' ')?.[0] ?? ''),
+              lastName: prev.lastName || cliente.apellido || (user.user_metadata?.name?.split?.(' ')?.slice(1).join(' ') ?? ''),
+              phone: prev.phone || cliente.telefono || '',
+              dni: prev.dni || cliente.dni || '',
+              calle: prev.calle || (cliente.direccion ? cliente.direccion.split(' ')[0] : ''),
+              numero: prev.numero || (cliente.direccion ? cliente.direccion.split(' ').slice(1).join(' ') : ''),
+              city: prev.city || cliente.ciudad || '',
+              province: prev.province || cliente.provincia || '',
+              postalCode: prev.postalCode || cliente.codigo_postal || '',
+            }));
+          } else {
+            // Si no hay cliente, solo usar datos del user
+            setFormData((prev) => ({
+              ...prev,
+              email: prev.email || user.email || '',
+              firstName: prev.firstName || (user.user_metadata?.name?.split?.(' ')?.[0] ?? ''),
+              lastName: prev.lastName || (user.user_metadata?.name?.split?.(' ')?.slice(1).join(' ') ?? ''),
+            }));
+          }
         }
         setProfileLoaded(true);
         setDbgStep('profile:load:done');
@@ -550,78 +671,191 @@ export default function CheckoutScreen() {
 
     setIsSubmitting(true);
     try {
-      if (paymentMethod === 'mercadopago' && USE_WEB_API_CHECKOUT) {
+      // Usar APIs web si está configurado
+      if (USE_WEB_API_CHECKOUT) {
         setIsProcessing(true);
-
-        const returnUrl = LinkingExpo.createURL('/(client)');
         setDbgStep('webapi:build-payload');
 
-        const payload = {
+        // 1. Preparar payload para crear orden
+        const orderPayload = {
           items: orderSummary.items.map((it) => ({
             id: String(it.id),
             variantId: it.variantId ?? null,
             quantity: it.quantity,
+            price: it.price,
           })),
-          customer: {
-            name: `${formData.firstName} ${formData.lastName}`.trim(),
+          customerInfo: {
+            firstName: formData.firstName,
+            lastName: formData.lastName,
             email: formData.email,
             phone: formData.phone,
+            dni: formData.dni,
           },
-          shipping:
+          shippingInfo:
             shippingMethod === 'pickup'
-              ? { optionCode: 'PICKUP' }
+              ? {
+                  method: 'retiro',
+                  address: null,
+                  postalCode: null,
+                }
+              : shippingMethod === 'branch'
+              ? {
+                  method: 'sucursal',
+                  branchDetails: {
+                    nombre: selectedBranch?.nombre ?? '',
+                    codigoSucursal: selectedBranch?.codigoSucursal ?? '',
+                    direccion: selectedBranch?.direccion ?? '',
+                    localidad: selectedBranch?.localidad ?? '',
+                    provincia: selectedBranch?.provincia ?? '',
+                    codigoPostal: selectedBranch?.codigoPostal ?? '',
+                  },
+                  address: {
+                    calle: formData.calle || '',
+                    numero: formData.numero || '',
+                    departamento: formData.departamento || '',
+                    barrio: formData.barrio || '',
+                    ciudad: formData.city,
+                    provincia: formData.province,
+                    codigo_postal: formData.postalCode,
+                  },
+                }
               : {
-                  optionCode:
-                    selectedShippingOption?.operativa ?? (shippingMethod === 'branch' ? '414610' : '414609'),
-                  address:
-                    shippingMethod === 'delivery'
-                      ? {
-                          street: formData.calle,
-                          number: formData.numero,
-                          apartment: formData.departamento || null,
-                          city: formData.city,
-                          province: formData.province,
-                          postalCode: formData.postalCode,
-                        }
-                      : {
-                          branchName: selectedBranch?.nombre ?? null,
-                          branchCode: selectedBranch?.codigoSucursal ?? null,
-                          branchPostalCode: selectedBranch?.codigoPostal ?? formData.postalCode,
-                          city: selectedBranch?.localidad ?? formData.city,
-                          province: selectedBranch?.provincia ?? formData.province,
-                        },
+                  method: 'delivery',
+                  address: {
+                    calle: formData.calle,
+                    numero: formData.numero,
+                    departamento: formData.departamento || '',
+                    barrio: formData.barrio || '',
+                    ciudad: formData.city,
+                    provincia: formData.province,
+                    codigo_postal: formData.postalCode,
+                  },
                 },
+          paymentMethod: paymentMethod === 'mercadopago' ? 'MercadoPago' : paymentMethod === 'transfer' ? 'Transferencia' : 'Efectivo',
+          shippingCost: orderSummary.shipping,
+          subtotal: orderSummary.subtotal,
+          discount: orderSummary.discount,
+          total: orderSummary.total,
           couponCode: appliedCoupon?.code ?? null,
-          returnUrl,
-        } as const;
+          notes: formData.notes || null,
+        };
 
-        console.log('[checkout] POST /api/checkout payload', payload);
-        setDbgStep('webapi:request');
-        const res = await apiPost<{ orderId?: string; mpPreferenceId?: string; redirectUrl?: string }>(
-          '/api/checkout',
-          payload
+        console.log('[checkout] POST /api/orders payload', orderPayload);
+        setDbgStep('webapi:create-order');
+
+        // 2. Crear orden
+        const orderRes = await apiPost<any>(
+          '/api/orders',
+          orderPayload
         );
-        console.log('[checkout] /api/checkout resp', res);
-        setDbgStep('webapi:response');
+        console.log('[checkout] /api/orders resp COMPLETO:', JSON.stringify(orderRes, null, 2));
 
-        if (res?.redirectUrl) {
-          console.log('[checkout] opening browser', res.redirectUrl);
-          await WebBrowser.openBrowserAsync(res.redirectUrl);
-          Alert.alert(
-            'Continuá el pago',
-            'Te redirigimos a Mercado Pago. Una vez finalizado, vas a ver el estado de tu pedido. Podés volver a la app cuando quieras.'
+        // La API puede devolver diferentes formatos
+        const orderNumber = 
+          orderRes?.order_number || 
+          orderRes?.orderNumber || 
+          orderRes?.numero_pedido ||
+          orderRes?.numeroPedido ||
+          orderRes?.pedido?.numero_pedido ||  // ← La API devuelve en este formato
+          orderRes?.pedido?.numeroPedido ||
+          orderRes?.data?.order_number ||
+          orderRes?.data?.orderNumber ||
+          orderRes?.data?.numero_pedido;
+
+        if (!orderNumber) {
+          console.error('[checkout] No se encontró order_number en la respuesta:', orderRes);
+          throw new Error(`No se recibió el número de pedido. Respuesta: ${JSON.stringify(orderRes)}`);
+        }
+
+        console.log('[checkout] Order number obtenido:', orderNumber);
+        setDbgStep('webapi:order-created');
+
+        // 3. Si es Mercado Pago, crear preferencia y redirigir
+        if (paymentMethod === 'mercadopago') {
+          console.log('[checkout] Creating MP preference...');
+          setDbgStep('webapi:create-preference');
+
+          const preferencePayload = {
+            order_number: orderNumber,
+            items: orderSummary.items.map((it) => {
+              const unitPrice = Number(it.price);
+              const quantity = Number(it.quantity);
+              
+              console.log('[checkout] Item para MP:', {
+                name: it.name,
+                price: it.price,
+                unitPrice,
+                quantity,
+                valid: Number.isFinite(unitPrice) && unitPrice > 0
+              });
+
+              return {
+                title: it.name || 'Producto',
+                quantity: quantity > 0 ? quantity : 1,
+                unit_price: Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 1,
+              };
+            }),
+            payer: {
+              name: formData.firstName,
+              surname: formData.lastName,
+              email: formData.email,
+              phone: { number: formData.phone },
+            },
+            total: orderSummary.total,
+          };
+
+          console.log('[checkout] Preference payload:', JSON.stringify(preferencePayload, null, 2));
+
+          const prefRes = await apiPost<{ init_point?: string; sandbox_init_point?: string }>(
+            '/api/create-preference',
+            preferencePayload
           );
-          setDbgStep('webapi:redirected');
-          router.replace('/(client)/profile');
-          return;
+          console.log('[checkout] /api/create-preference resp', prefRes);
+
+          if (prefRes?.init_point || prefRes?.sandbox_init_point) {
+            const redirectUrl = prefRes.init_point || prefRes.sandbox_init_point;
+            console.log('[checkout] opening browser', redirectUrl);
+            setDbgStep('webapi:redirecting-mp');
+            
+            await WebBrowser.openBrowserAsync(redirectUrl!);
+            clearCart();
+            
+            Alert.alert(
+              'Continuá el pago',
+              'Te redirigimos a Mercado Pago. Una vez finalizado el pago, tu pedido será procesado.',
+              [
+                {
+                  text: 'Ver mis pedidos',
+                  onPress: () => router.replace('/(client)/profile'),
+                },
+                {
+                  text: 'Volver al inicio',
+                  onPress: () => router.replace('/(client)'),
+                },
+              ]
+            );
+            return;
+          } else {
+            throw new Error('No se pudo obtener el link de pago de Mercado Pago');
+          }
         } else {
-          Alert.alert('Pedido creado', 'Tu pedido fue generado. Revisá tu email para continuar el pago.');
-          setDbgStep('webapi:created');
+          // 4. Para transferencia o efectivo, mostrar confirmación
+          clearCart();
+          setDbgStep('webapi:order-done');
+          
+          // Redirigir a la pantalla de confirmación
           router.replace('/(client)');
+          setTimeout(() => {
+            router.push({
+              pathname: '/(client)/pago/confirmado' as any,
+              params: { order_number: orderNumber },
+            });
+          }, 100);
           return;
         }
       }
 
+      // Fallback: crear orden directamente en Supabase (sin API web)
       setDbgStep('fallback:start');
       const { numeroPedido } = await createOrderInSupabaseFallback();
       clearCart();

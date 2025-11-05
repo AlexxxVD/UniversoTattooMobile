@@ -116,7 +116,6 @@ export default function ProfileScreen() {
   }, [params?.tab]);
 
   const startEdit = useCallback(() => {
-    console.log('[profile] startEdit called, cliente:', cliente);
     if (!cliente) {
       Toast.show({ type: 'error', text1: 'No se pudo cargar la información del perfil' });
       return;
@@ -137,12 +136,11 @@ export default function ProfileScreen() {
       provincia: cliente.provincia ?? '',
       codigo_postal: cliente.codigo_postal ?? '',
     });
-    console.log('[profile] opening edit modal');
     setShowEdit(true);
   }, [cliente]);
 
   const saveEdit = useCallback(async () => {
-    if (!cliente?.id_cliente) return;
+    if (!cliente?.id_cliente || !cliente?.userId) return;
     if (!edit.nombre.trim() || !edit.apellido.trim() || !edit.email.trim()) {
       Toast.show({ type: 'error', text1: 'Completá nombre, apellido y email' });
       return;
@@ -166,12 +164,14 @@ export default function ProfileScreen() {
         codigo_postal: edit.codigo_postal.trim() || null,
         fecha_actualizacion: new Date().toISOString(),
       };
+      
       const { data, error } = await supabase
         .from('Cliente')
         .update(payload as any)
-        .eq('id_cliente', cliente.id_cliente)
+        .eq('userId', cliente.userId)
         .select('*')
         .maybeSingle();
+      
       if (error) throw error;
       setCliente((data as any) ?? cliente);
       setShowEdit(false);
@@ -190,7 +190,6 @@ export default function ProfileScreen() {
     try {
       const { data } = await supabase.auth.getSession();
       const uid = data.session?.user?.id ?? null;
-      console.log('[profile] loadProfile - userId:', uid);
       
       if (!uid) {
         Toast.show({ type: 'error', text1: 'Iniciá sesión' });
@@ -205,13 +204,9 @@ export default function ProfileScreen() {
         .eq('userId', uid)
         .maybeSingle();
 
-      console.log('[profile] loadProfile - clienteRow:', clienteRow);
-      console.log('[profile] loadProfile - error:', clienteErr);
-
       if (clienteErr) throw clienteErr;
       
       if (!clienteRow) {
-        console.log('[profile] No se encontró cliente con userId:', uid);
         // Intentar crear el registro de Cliente
         const user = data.session?.user;
         const meta = user?.user_metadata || {};
@@ -235,7 +230,6 @@ export default function ProfileScreen() {
           .single();
 
         if (insertError) {
-          console.error('[profile] Error creando Cliente:', insertError);
           Toast.show({ 
             type: 'error', 
             text1: 'Error al crear perfil',
@@ -243,7 +237,6 @@ export default function ProfileScreen() {
           });
           setCliente(null);
         } else {
-          console.log('[profile] Cliente creado exitosamente:', newCliente);
           Toast.show({ 
             type: 'success', 
             text1: 'Perfil creado',

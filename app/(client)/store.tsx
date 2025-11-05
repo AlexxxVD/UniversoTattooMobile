@@ -286,11 +286,19 @@ export default function ShopScreen() {
             .eq('user_id', uid)
             .eq('producto_id', productId);
           if (error) throw error;
+          Toast.show({
+            type: 'info',
+            text1: 'Eliminado de favoritos',
+          });
         } else {
           const { error } = await supabase
             .from('Favoritos')
             .insert({ user_id: uid, producto_id: productId });
           if (error) throw error;
+          Toast.show({
+            type: 'success',
+            text1: 'Agregado a favoritos ❤️',
+          });
         }
       } catch (e: any) {
         // revertir
