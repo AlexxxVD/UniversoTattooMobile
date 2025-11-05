@@ -16,7 +16,6 @@ import {
   useWindowDimensions
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
 import { API_BASE } from '../../lib/api';
 
 const C = {
@@ -90,11 +89,12 @@ function img(src: string): any {
 
 
 // CATEGORIES como array mutable tipado, para evitar readonly y unknown
+// Usamos los nombres exactos de la base de datos para que el filtro funcione
 const CATEGORIES: Category[] = [
-  { name: 'Máquinas', image: '/img/maquinas.webp', link: 'Máquinas' },
-  { name: 'Agujas', image: '/img/agujas.webp', link: 'Agujas' },
+  { name: 'Máquinas', image: '/img/maquinas.webp', link: 'Maquinas' },
+  { name: 'Agujas', image: '/img/agujas.webp', link: 'Agujas y Cartuchos' },
   { name: 'Tintas', image: '/img/tintas.webp', link: 'Tintas' },
-  { name: 'Accesorios', image: '/img/accesorios.webp', link: 'Accesorios' },
+  { name: 'Accesorios', image: '/img/accesorios.webp', link: 'Stencil' },
 ];
 
 const TESTIMONIALS = [
@@ -212,15 +212,19 @@ export default function ClientHome() {
 
         {/* Video Lanzamiento */}
         <Section title="Lanzamiento Oficial" subtitle="Cómo Universo Tattoo está revolucionando el mundo de los insumos">
-          <View style={styles.videoWrap}>
-            <WebView
-              style={{ width: '100%', height: videoHeight, backgroundColor: '#000' }}
-              source={{ uri: 'https://www.youtube.com/embed/UdMqkpcwB9k' }}
-              allowsFullscreenVideo
-              javaScriptEnabled
-              domStorageEnabled
+          <Pressable
+            onPress={() => openURL('https://www.youtube.com/watch?v=UdMqkpcwB9k')}
+            style={styles.videoWrap}
+          >
+            <Image
+              source={{ uri: 'https://img.youtube.com/vi/UdMqkpcwB9k/maxresdefault.jpg' }}
+              style={{ width: '100%', height: videoHeight, borderRadius: 12 }}
+              resizeMode="cover"
             />
-          </View>
+            <View style={styles.playButton}>
+              <Ionicons name="play-circle" size={64} color="#fff" />
+            </View>
+          </Pressable>
 
           <View style={{ alignItems: 'center', gap: 8, marginTop: 10 }}>
             <Text style={{ color: C.muted }}>¿Te gustó lo que viste? ¡Sumate a la comunidad!</Text>
@@ -435,11 +439,22 @@ const styles = StyleSheet.create({
   },
 
   videoWrap: {
+    position: 'relative',
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(124,58,237,0.35)',
     backgroundColor: '#000',
+  },
+  playButton: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -32 }, { translateY: -32 }],
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   categoryCard: {
