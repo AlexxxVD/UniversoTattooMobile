@@ -1,12 +1,12 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -125,10 +125,82 @@ export default function CustomersScreen() {
       const rows = data ?? [];
       setHasMore(rows.length === PAGE_SIZE);
 
+      // Si no hay clientes, no hacer queries adicionales
+      if (rows.length === 0) {
+        if (replace) {
+          setItems([]);
+        }
+        setPage(nextPage);
+        return;
+      }
+
+      // Obtener IDs de clientes para las queries de estadísticas
+      const clienteIds = rows.map((c) => c.id_cliente);
+
+      // Hacer 3 queries en paralelo para obtener estadísticas (igual que en la web)
+      const [pedidosData, pedidosTotalesData, ultimosPedidosData] = await Promise.all([
+        // 1. Contar pedidos por cliente
+        supabase
+          .from('Pedido')
+          .select('clienteId')
+          .in('clienteId', clienteIds),
+
+        // 2. Sumar totales de pedidos por cliente
+        supabase
+          .from('Pedido')
+          .select('clienteId, total')
+          .in('clienteId', clienteIds),
+
+        // 3. Obtener último pedido por cliente
+        supabase
+          .from('Pedido')
+          .select('clienteId, fecha_pedido')
+          .in('clienteId', clienteIds)
+          .order('fecha_pedido', { ascending: false }),
+      ]);
+
+      // Crear mapas de estadísticas por clienteId
+      const pedidosCountMap = new Map<number, number>();
+      const gastoTotalMap = new Map<number, number>();
+      const ultimoPedidoMap = new Map<number, string>();
+
+      // Contar pedidos por cliente
+      if (pedidosData.data) {
+        pedidosData.data.forEach((pedido: any) => {
+          const count = pedidosCountMap.get(pedido.clienteId) || 0;
+          pedidosCountMap.set(pedido.clienteId, count + 1);
+        });
+      }
+
+      // Sumar totales por cliente
+      if (pedidosTotalesData.data) {
+        pedidosTotalesData.data.forEach((pedido: any) => {
+          const currentTotal = gastoTotalMap.get(pedido.clienteId) || 0;
+          gastoTotalMap.set(pedido.clienteId, currentTotal + (pedido.total || 0));
+        });
+      }
+
+      // Obtener último pedido por cliente
+      if (ultimosPedidosData.data) {
+        ultimosPedidosData.data.forEach((pedido: any) => {
+          if (!ultimoPedidoMap.has(pedido.clienteId)) {
+            ultimoPedidoMap.set(pedido.clienteId, pedido.fecha_pedido);
+          }
+        });
+      }
+
+      // Agregar estadísticas a cada cliente
+      const rowsWithStats = rows.map((cliente) => ({
+        ...cliente,
+        total_pedidos: pedidosCountMap.get(cliente.id_cliente) || 0,
+        total_gastado: gastoTotalMap.get(cliente.id_cliente) || 0,
+        ultimo_pedido: ultimoPedidoMap.get(cliente.id_cliente) || null,
+      }));
+
       if (replace) {
-        setItems(rows);
+        setItems(rowsWithStats);
       } else {
-        setItems((prev) => [...prev, ...rows]);
+        setItems((prev) => [...prev, ...rowsWithStats]);
       }
       setPage(nextPage);
     },
@@ -245,6 +317,10 @@ export default function CustomersScreen() {
 
 function ClientCard({ item }: { item: Cliente }) {
   const fecha = item.fecha_registro ? new Date(item.fecha_registro) : null;
+  const ultimoPedido = (item as any).ultimo_pedido ? new Date((item as any).ultimo_pedido) : null;
+  const totalPedidos = (item as any).total_pedidos ?? 0;
+  const totalGastado = (item as any).total_gastado ?? 0;
+
   return (
     <View style={styles.card}>
       <View style={{ flex: 1 }}>
@@ -252,14 +328,35 @@ function ClientCard({ item }: { item: Cliente }) {
           {item.nombre} {item.apellido}
         </Text>
         {!!item.email && <Text style={styles.email}>{item.email}</Text>}
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
+        
+        {/* Estadísticas principales */}
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Pedidos</Text>
+            <Text style={styles.statNumber}>{totalPedidos}</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Gasto Total</Text>
+            <Text style={styles.statNumber}>$ {totalGastado.toLocaleString('es-AR')}</Text>
+          </View>
+          {ultimoPedido && (
+            <>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Último Pedido</Text>
+                <Text style={styles.statDate}>{ultimoPedido.toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })}</Text>
+              </View>
+            </>
+          )}
+        </View>
+
+        {/* Badges de información adicional */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
           {!!item.telefono && <Badge label={item.telefono} />}
           {!!item.provincia && <Badge label={item.provincia} />}
-          {!!fecha && <Badge label={fecha.toLocaleDateString()} />}
+          {!!fecha && <Badge label={fecha.toLocaleDateString('es-AR')} />}
         </View>
-        {'total_gastado' in item && (item as any).total_gastado != null ? (
-          <Text style={styles.total}>Total gastado: $ {(item as any).total_gastado?.toLocaleString?.() ?? 0}</Text>
-        ) : null}
       </View>
     </View>
   );
@@ -307,8 +404,44 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   name: { color: C.text, fontWeight: '800', fontSize: 16 },
-  email: { color: C.muted },
-  total: { color: C.text, marginTop: 8, fontWeight: '600' },
+  email: { color: C.muted, fontSize: 13, marginTop: 2 },
+  
+  // Stats row dentro de cada card
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0A0D12',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 10,
+    gap: 8,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statLabel: {
+    color: '#A0A8B0',
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  statNumber: {
+    color: C.text,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  statDate: {
+    color: C.text,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  statDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: C.border,
+  },
 
   badge: {
     backgroundColor: '#11151B',

@@ -2,16 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Modal,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -74,6 +74,9 @@ export default function OrdersScreen() {
   // Modal de detalles
   const [selectedOrder, setSelectedOrder] = useState<PedidoConCliente | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  
+  // Modal de creación manual
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   // Admin gating (consistente con otras pantallas)
   useEffect(() => {
@@ -203,7 +206,24 @@ export default function OrdersScreen() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}
           ListHeaderComponent={
             <View style={{ gap: 12 }}>
-              <Text style={styles.title}>Pedidos</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={styles.title}>Pedidos</Text>
+                <Pressable
+                  onPress={() => setShowCreateModal(true)}
+                  style={{
+                    backgroundColor: C.primary,
+                    paddingHorizontal: 14,
+                    paddingVertical: 8,
+                    borderRadius: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <Ionicons name="add-circle-outline" size={18} color="#FFF" />
+                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Nuevo</Text>
+                </Pressable>
+              </View>
 
               {/* Buscador */}
               <View style={styles.searchRow}>
@@ -261,6 +281,15 @@ export default function OrdersScreen() {
           }}
         />
       )}
+      
+      {/* Modal de creación manual */}
+      <CreateManualOrderModal
+        visible={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onOrderCreated={() => {
+          fetchPage(0, true);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -295,6 +324,1011 @@ function TabsBar({
         );
       })}
     </View>
+  );
+}
+
+// ===========================
+// CREAR PEDIDO MANUAL MODAL
+// ===========================
+interface Producto {
+  id_producto: number;
+  nombre: string;
+  precio_base: number;
+  stock_total: number;
+  imagen_url?: string;
+  Categoria?: { 
+    id_categoria: number;
+    nombre: string;
+  };
+  ProductoVariante?: Array<{
+    id_variante: number;
+    stock: number;
+    color?: string;
+    volumen?: string;
+    grosor?: string;
+    numero_agujas?: string;
+    configuracion_aguja?: string;
+  }>;
+}
+
+interface OrderItem {
+  producto: Producto;
+  cantidad: number;
+  variante_id?: number;
+  variante?: any;
+}
+
+function CreateManualOrderModal({
+  visible,
+  onClose,
+  onOrderCreated,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onOrderCreated?: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+  const [loadingProductos, setLoadingProductos] = useState(false);
+  
+  // Productos y categorías
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [filteredProductos, setFilteredProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<any[]>([]);
+  const [selectedCategoria, setSelectedCategoria] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Items del carrito
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  
+  // Datos del cliente
+  const [clienteNombre, setClienteNombre] = useState('');
+  const [clienteApellido, setClienteApellido] = useState('');
+  const [clienteEmail, setClienteEmail] = useState('');
+  const [clienteTelefono, setClienteTelefono] = useState('');
+  const [metodoPago, setMetodoPago] = useState('efectivo');
+  const [estadoPedido, setEstadoPedido] = useState<EstadoPedido>('PENDIENTE');
+  const [estadoPago, setEstadoPago] = useState<EstadoPago>('PENDIENTE');
+  
+  // Modal de selección de variantes
+  const [selectingVariantFor, setSelectingVariantFor] = useState<Producto | null>(null);
+  const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
+
+  // Cargar productos y categorías
+  useEffect(() => {
+    if (visible) {
+      loadData();
+    }
+  }, [visible]);
+
+  const loadData = async () => {
+    setLoadingProductos(true);
+    try {
+      // Cargar categorías
+      const { data: cats, error: catsError } = await supabase
+        .from('Categoria')
+        .select('*')
+        .order('nombre');
+      if (!catsError && cats) setCategorias(cats);
+
+      // Cargar productos con variantes (igual que en la web)
+      const { data: prods, error: prodsError } = await supabase
+        .from('Producto')
+        .select(`
+          id_producto,
+          nombre,
+          precio_base,
+          stock_total,
+          es_activo,
+          Categoria(id_categoria, nombre),
+          ProductoVariante(
+            id_variante,
+            stock,
+            color,
+            volumen,
+            grosor,
+            numero_agujas,
+            configuracion_aguja,
+            atributos_personalizados,
+            es_activa
+          )
+        `)
+        .eq('es_activo', true)
+        .order('nombre');
+
+      if (prodsError) {
+        console.error('❌ Error cargando productos:', prodsError);
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: prodsError.message || 'No se pudieron cargar los productos',
+        });
+        setProductos([]);
+        setFilteredProductos([]);
+      } else if (prods) {
+        // Calcular stock total sumando todas las variantes
+        const prodsConStock = prods.map((prod: any) => {
+          const stockCalculado = prod.ProductoVariante?.reduce(
+            (total: number, variante: any) => total + (variante.stock || 0),
+            0
+          ) || prod.stock_total || 0;
+          
+          return {
+            ...prod,
+            stock_total: stockCalculado,
+          };
+        });
+        
+        console.log('📦 Productos cargados:', prodsConStock.length);
+        if (prodsConStock.length > 0) {
+          console.log('📊 Ejemplo producto:', JSON.stringify(prodsConStock[0], null, 2));
+        }
+        setProductos(prodsConStock as any);
+        setFilteredProductos(prodsConStock as any);
+      }
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudieron cargar los productos',
+      });
+    } finally {
+      setLoadingProductos(false);
+    }
+  };
+
+  // Filtrar productos
+  useEffect(() => {
+    let filtered = productos;
+
+    if (selectedCategoria && selectedCategoria !== 'todos') {
+      filtered = filtered.filter((p) => p.Categoria?.id_categoria?.toString() === selectedCategoria);
+    }
+
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      filtered = filtered.filter((p) =>
+        p.nombre.toLowerCase().includes(search) ||
+        p.Categoria?.nombre?.toLowerCase().includes(search)
+      );
+    }
+
+    setFilteredProductos(filtered);
+  }, [selectedCategoria, searchTerm, productos]);
+
+  const getVarianteLabel = (variante: any) => {
+    if (!variante) return null;
+    const parts: string[] = [];
+    if (variante.color) parts.push(variante.color);
+    if (variante.volumen) parts.push(variante.volumen);
+    if (variante.grosor) parts.push(variante.grosor);
+    if (variante.numero_agujas) parts.push(variante.numero_agujas);
+    if (variante.configuracion_aguja) parts.push(variante.configuracion_aguja);
+    return parts.length > 0 ? parts.join(' • ') : `Variante ${variante.id_variante}`;
+  };
+
+  const addProductToOrder = (producto: Producto, varianteId?: number) => {
+    // Si tiene variantes y no se seleccionó una, abrir selector
+    if (producto.ProductoVariante && producto.ProductoVariante.length > 0 && !varianteId) {
+      setSelectingVariantFor(producto);
+      setSelectedVariantId(null);
+      return;
+    }
+
+    const variante = varianteId
+      ? producto.ProductoVariante?.find((v) => v.id_variante === varianteId)
+      : undefined;
+
+    const existingItem = orderItems.find(
+      (item) =>
+        item.producto.id_producto === producto.id_producto &&
+        item.variante_id === varianteId
+    );
+
+    if (existingItem) {
+      setOrderItems(
+        orderItems.map((item) =>
+          item.producto.id_producto === producto.id_producto &&
+          item.variante_id === varianteId
+            ? { ...item, cantidad: item.cantidad + 1 }
+            : item
+        )
+      );
+    } else {
+      setOrderItems([
+        ...orderItems,
+        {
+          producto,
+          cantidad: 1,
+          variante_id: varianteId,
+          variante: variante,
+        },
+      ]);
+    }
+
+    const varianteLabel = variante ? getVarianteLabel(variante) : '';
+    const varianteText = varianteLabel ? ` (${varianteLabel})` : '';
+    
+    Toast.show({
+      type: 'success',
+      text1: 'Producto agregado',
+      text2: `${producto.nombre}${varianteText}`,
+    });
+
+    setSelectingVariantFor(null);
+  };
+
+  const confirmVariantSelection = () => {
+    if (selectingVariantFor && selectedVariantId) {
+      addProductToOrder(selectingVariantFor, selectedVariantId);
+    }
+  };
+
+  const updateQuantity = (productoId: number, cantidad: number, varianteId?: number) => {
+    if (cantidad <= 0) {
+      removeProduct(productoId, varianteId);
+      return;
+    }
+
+    setOrderItems(
+      orderItems.map((item) =>
+        item.producto.id_producto === productoId && item.variante_id === varianteId
+          ? { ...item, cantidad }
+          : item
+      )
+    );
+  };
+
+  const removeProduct = (productoId: number, varianteId?: number) => {
+    setOrderItems(
+      orderItems.filter(
+        (item) =>
+          !(item.producto.id_producto === productoId && item.variante_id === varianteId)
+      )
+    );
+  };
+
+  const calculateTotal = () => {
+    return orderItems.reduce(
+      (sum, item) => sum + item.producto.precio_base * item.cantidad,
+      0
+    );
+  };
+
+  const generateOrderNumber = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const random = Math.floor(1000 + Math.random() * 9000);
+    return `ORD-${year}${month}${day}-${random}`;
+  };
+
+  const handleCreateOrder = async () => {
+    // Validaciones
+    if (!clienteNombre.trim() || !clienteApellido.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'El nombre y apellido son obligatorios',
+      });
+      return;
+    }
+
+    if (orderItems.length === 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Debes agregar al menos un producto',
+      });
+      return;
+    }
+
+    // Verificar stock
+    for (const item of orderItems) {
+      const stockDisponible = item.variante
+        ? item.variante.stock
+        : item.producto.stock_total;
+
+      if (stockDisponible < item.cantidad) {
+        const varianteText = item.variante
+          ? ` (${getVarianteLabel(item.variante)})`
+          : '';
+        Toast.show({
+          type: 'error',
+          text1: 'Stock insuficiente',
+          text2: `${item.producto.nombre}${varianteText}`,
+        });
+        return;
+      }
+    }
+
+    try {
+      setLoading(true);
+
+      // 1. Buscar o crear cliente
+      let clienteId: number;
+
+      if (clienteEmail.trim()) {
+        // Buscar cliente existente por email
+        const { data: existingCliente } = await supabase
+          .from('Cliente')
+          .select('id_cliente')
+          .eq('email', clienteEmail.trim())
+          .limit(1)
+          .maybeSingle();
+
+        if (existingCliente) {
+          clienteId = existingCliente.id_cliente;
+        } else {
+          // Crear nuevo cliente
+          const { data: newCliente, error: clienteError } = await supabase
+            .from('Cliente')
+            .insert({
+              nombre: clienteNombre.trim(),
+              apellido: clienteApellido.trim(),
+              email: clienteEmail.trim(),
+              telefono: clienteTelefono.trim() || null,
+              acepta_marketing: false,
+              total_gastado: 0,
+            })
+            .select('id_cliente')
+            .single();
+
+          if (clienteError) throw clienteError;
+          clienteId = newCliente.id_cliente;
+        }
+      } else {
+        // Sin email, crear cliente básico
+        const { data: newCliente, error: clienteError } = await supabase
+          .from('Cliente')
+          .insert({
+            nombre: clienteNombre.trim(),
+            apellido: clienteApellido.trim(),
+            email: `cliente_${Date.now()}@temp.com`, // Email temporal
+            telefono: clienteTelefono.trim() || null,
+            acepta_marketing: false,
+            total_gastado: 0,
+          })
+          .select('id_cliente')
+          .single();
+
+        if (clienteError) throw clienteError;
+        clienteId = newCliente.id_cliente;
+      }
+
+      // 2. Crear pedido
+      const orderNumber = generateOrderNumber();
+      const total = calculateTotal();
+
+      const { data: pedido, error: pedidoError } = await supabase
+        .from('Pedido')
+        .insert({
+          numero_pedido: orderNumber,
+          clienteId: clienteId,
+          estado: estadoPedido,
+          estado_pago: estadoPago,
+          metodo_pago: metodoPago,
+          subtotal: total,
+          total: total,
+          envio: 0,
+          descuento: 0,
+          impuestos: 0,
+          nombre_comprador: clienteNombre.trim(),
+          apellido_comprador: clienteApellido.trim(),
+          email_comprador: clienteEmail.trim() || null,
+          telefono_comprador: clienteTelefono.trim() || null,
+          fecha_pedido: new Date().toISOString(),
+        })
+        .select('id_pedido')
+        .single();
+
+      if (pedidoError) throw pedidoError;
+
+      // 3. Crear PedidoProducto
+      const pedidoProductos = orderItems.map((item) => ({
+        pedidoId: pedido.id_pedido,
+        productoId: item.producto.id_producto,
+        varianteId: item.variante_id || null,
+        cantidad: item.cantidad,
+        precio_unitario: item.producto.precio_base,
+        descuento: 0,
+      }));
+
+      const { error: ppError } = await supabase
+        .from('PedidoProducto')
+        .insert(pedidoProductos);
+
+      if (ppError) throw ppError;
+
+      // 4. Actualizar stock (comentado porque la función RPC no existe en mobile)
+      // for (const item of orderItems) {
+      //   if (item.variante_id) {
+      //     const { error: stockError } = await supabase.rpc('decrementar_stock_variante', {
+      //       p_variante_id: item.variante_id,
+      //       p_cantidad: item.cantidad,
+      //     });
+      //     if (stockError) console.error('Error actualizando stock variante:', stockError);
+      //   }
+      // }
+      
+      // TODO: Implementar actualización de stock manualmente si es necesario
+
+      Toast.show({
+        type: 'success',
+        text1: '¡Pedido creado!',
+        text2: `#${orderNumber}`,
+      });
+
+      // Resetear formulario
+      setClienteNombre('');
+      setClienteApellido('');
+      setClienteEmail('');
+      setClienteTelefono('');
+      setOrderItems([]);
+      setSelectedCategoria('');
+      setSearchTerm('');
+      setEstadoPedido('PENDIENTE');
+      setEstadoPago('PENDIENTE');
+      setMetodoPago('efectivo');
+
+      if (onOrderCreated) onOrderCreated();
+      onClose();
+    } catch (error) {
+      console.error('Error creando pedido:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'No se pudo crear el pedido',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+        <Pressable style={{ flex: 1 }} onPress={onClose} />
+        <View
+          style={{
+            backgroundColor: C.card,
+            borderTopLeftRadius: 20,
+            borderTopRightRadius: 20,
+            maxHeight: '90%',
+            padding: 14,
+            borderWidth: 1,
+            borderColor: C.border,
+          }}
+        >
+          {/* Header */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: C.text }}>
+              Crear Pedido Manual
+            </Text>
+            <Pressable onPress={onClose} hitSlop={10}>
+              <Ionicons name="close" size={24} color={C.text} />
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ maxHeight: 550 }} showsVerticalScrollIndicator={false}>
+            <View style={{ gap: 10 }}>
+              {/* Datos del Cliente */}
+              <View style={{ backgroundColor: '#11151B', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: C.border }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.text, marginBottom: 8 }}>
+                  Datos del Cliente
+                </Text>
+                <View style={{ gap: 6 }}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.label}>Nombre *</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={clienteNombre}
+                        onChangeText={setClienteNombre}
+                        placeholder="Juan"
+                        placeholderTextColor={C.muted}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.label}>Apellido *</Text>
+                      <TextInput
+                        style={styles.input}
+                        value={clienteApellido}
+                        onChangeText={setClienteApellido}
+                        placeholder="Pérez"
+                        placeholderTextColor={C.muted}
+                      />
+                    </View>
+                  </View>
+                  <View>
+                    <Text style={styles.label}>Email</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={clienteEmail}
+                      onChangeText={setClienteEmail}
+                      placeholder="cliente@email.com"
+                      placeholderTextColor={C.muted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.label}>Teléfono</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={clienteTelefono}
+                      onChangeText={setClienteTelefono}
+                      placeholder="+598 99 123 456"
+                      placeholderTextColor={C.muted}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.label}>Método de Pago</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                      {['efectivo', 'debito', 'credito', 'transferencia'].map((metodo) => (
+                        <Pressable
+                          key={metodo}
+                          onPress={() => setMetodoPago(metodo)}
+                          style={{
+                            paddingHorizontal: 10,
+                            paddingVertical: 6,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: metodoPago === metodo ? C.primary : C.border,
+                            backgroundColor: metodoPago === metodo ? C.primarySoft : 'transparent',
+                          }}
+                        >
+                          <Text style={{ fontSize: 11, color: metodoPago === metodo ? C.primary : C.muted, fontWeight: '600' }}>
+                            {metodo.charAt(0).toUpperCase() + metodo.slice(1)}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                  
+                  <View>
+                    <Text style={styles.label}>Estado del Pedido</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                      {[
+                        { value: 'PENDIENTE', label: 'Pendiente', emoji: '⏳' },
+                        { value: 'CONFIRMADO', label: 'Confirmado', emoji: '✅' },
+                        { value: 'PREPARANDO', label: 'Preparando', emoji: '📦' },
+                        { value: 'ENVIADO', label: 'Enviado', emoji: '🚚' },
+                        { value: 'ENTREGADO', label: 'Entregado', emoji: '🎉' },
+                      ].map((estado) => (
+                        <Pressable
+                          key={estado.value}
+                          onPress={() => setEstadoPedido(estado.value as EstadoPedido)}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 5,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: estadoPedido === estado.value ? C.primary : C.border,
+                            backgroundColor: estadoPedido === estado.value ? C.primarySoft : 'transparent',
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, color: estadoPedido === estado.value ? C.primary : C.muted, fontWeight: '600' }}>
+                            {estado.emoji} {estado.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                  
+                  <View>
+                    <Text style={styles.label}>Estado del Pago</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
+                      {[
+                        { value: 'PENDIENTE', label: 'Pendiente', emoji: '⏳' },
+                        { value: 'PAGADO', label: 'Pagado', emoji: '✅' },
+                        { value: 'FALLIDO', label: 'Fallido', emoji: '❌' },
+                        { value: 'REEMBOLSADO', label: 'Reembolsado', emoji: '🔄' },
+                      ].map((pago) => (
+                        <Pressable
+                          key={pago.value}
+                          onPress={() => setEstadoPago(pago.value as EstadoPago)}
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 5,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: estadoPago === pago.value ? C.primary : C.border,
+                            backgroundColor: estadoPago === pago.value ? C.primarySoft : 'transparent',
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, color: estadoPago === pago.value ? C.primary : C.muted, fontWeight: '600' }}>
+                            {pago.emoji} {pago.label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {/* Carrito */}
+              <View style={{ backgroundColor: '#11151B', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: C.border }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.text, marginBottom: 8 }}>
+                  Carrito ({orderItems.length})
+                </Text>
+                {orderItems.length === 0 ? (
+                  <Text style={{ fontSize: 12, color: C.muted, textAlign: 'center', paddingVertical: 10 }}>
+                    Sin productos. Agrega productos desde abajo.
+                  </Text>
+                ) : (
+                  <View style={{ gap: 6 }}>
+                    {orderItems.map((item, index) => {
+                      const varianteLabel = item.variante ? getVarianteLabel(item.variante) : null;
+                      return (
+                        <View
+                          key={`${item.producto.id_producto}-${item.variante_id || 'sin-variante'}-${index}`}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 8,
+                            backgroundColor: C.bg,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: C.border,
+                          }}
+                        >
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: C.text }} numberOfLines={1}>
+                              {item.producto.nombre}
+                            </Text>
+                            {varianteLabel && (
+                              <Text style={{ fontSize: 10, color: C.muted }} numberOfLines={1}>
+                                {varianteLabel}
+                              </Text>
+                            )}
+                            <Text style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                              ${item.producto.precio_base.toLocaleString()}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            <Pressable
+                              onPress={() =>
+                                updateQuantity(
+                                  item.producto.id_producto,
+                                  item.cantidad - 1,
+                                  item.variante_id
+                                )
+                              }
+                              style={{
+                                width: 28,
+                                height: 28,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 6,
+                                backgroundColor: C.border,
+                              }}
+                            >
+                              <Ionicons name="remove" size={14} color={C.text} />
+                            </Pressable>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: C.text, minWidth: 24, textAlign: 'center' }}>
+                              {item.cantidad}
+                            </Text>
+                            <Pressable
+                              onPress={() =>
+                                updateQuantity(
+                                  item.producto.id_producto,
+                                  item.cantidad + 1,
+                                  item.variante_id
+                                )
+                              }
+                              style={{
+                                width: 28,
+                                height: 28,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: 6,
+                                backgroundColor: C.primary,
+                              }}
+                            >
+                              <Ionicons name="add" size={14} color="#FFF" />
+                            </Pressable>
+                            <Pressable
+                              onPress={() => removeProduct(item.producto.id_producto, item.variante_id)}
+                              style={{ marginLeft: 4 }}
+                            >
+                              <Ionicons name="trash-outline" size={16} color={C.danger} />
+                            </Pressable>
+                          </View>
+                        </View>
+                      );
+                    })}
+                    <View
+                      style={{
+                        paddingTop: 8,
+                        marginTop: 4,
+                        borderTopWidth: 1,
+                        borderTopColor: C.border,
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: C.muted }}>Total:</Text>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: C.primary }}>
+                        ${calculateTotal().toLocaleString()}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Productos Disponibles */}
+              <View style={{ backgroundColor: '#11151B', padding: 10, borderRadius: 10, borderWidth: 1, borderColor: C.border }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: C.text, marginBottom: 8 }}>
+                  Productos Disponibles
+                </Text>
+
+                {/* Buscador */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.bg, borderRadius: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: C.border }}>
+                    <Ionicons name="search-outline" size={14} color={C.muted} />
+                    <TextInput
+                      style={{ flex: 1, color: C.text, fontSize: 12, paddingVertical: 8 }}
+                      placeholder="Buscar producto..."
+                      placeholderTextColor={C.muted}
+                      value={searchTerm}
+                      onChangeText={setSearchTerm}
+                    />
+                    {searchTerm && (
+                      <Pressable onPress={() => setSearchTerm('')}>
+                        <Ionicons name="close-circle" size={16} color={C.muted} />
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+
+                {/* Filtro por Categoría */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={{ marginBottom: 8 }}
+                  contentContainerStyle={{ gap: 4 }}
+                >
+                  <Pressable
+                    onPress={() => setSelectedCategoria('todos')}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: selectedCategoria === 'todos' || !selectedCategoria ? C.primary : C.border,
+                      backgroundColor: selectedCategoria === 'todos' || !selectedCategoria ? C.primarySoft : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: selectedCategoria === 'todos' || !selectedCategoria ? C.primary : C.muted, fontWeight: '600' }}>
+                      Todos
+                    </Text>
+                  </Pressable>
+                  {categorias.map((cat) => (
+                    <Pressable
+                      key={cat.id_categoria}
+                      onPress={() => setSelectedCategoria(cat.id_categoria.toString())}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: selectedCategoria === cat.id_categoria.toString() ? C.primary : C.border,
+                        backgroundColor: selectedCategoria === cat.id_categoria.toString() ? C.primarySoft : 'transparent',
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, color: selectedCategoria === cat.id_categoria.toString() ? C.primary : C.muted, fontWeight: '600' }}>
+                        {cat.nombre}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+
+                {/* Lista de Productos */}
+                {loadingProductos ? (
+                  <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={C.primary} />
+                  </View>
+                ) : filteredProductos.length === 0 ? (
+                  <Text style={{ fontSize: 12, color: C.muted, textAlign: 'center', paddingVertical: 10 }}>
+                    No hay productos disponibles
+                  </Text>
+                ) : (
+                  <ScrollView 
+                    style={{ maxHeight: 300 }} 
+                    nestedScrollEnabled={true}
+                    showsVerticalScrollIndicator={true}
+                  >
+                    <View style={{ gap: 4 }}>
+                      {filteredProductos.map((producto) => {
+                        const enCarrito = orderItems.find((item) => item.producto.id_producto === producto.id_producto);
+                        const tieneVariantes = producto.ProductoVariante && producto.ProductoVariante.length > 0;
+                      
+                      return (
+                        <Pressable
+                          key={producto.id_producto}
+                          onPress={() => addProductToOrder(producto)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            padding: 8,
+                            backgroundColor: enCarrito ? C.primarySoft : C.bg,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: enCarrito ? C.primary : C.border,
+                          }}
+                        >
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: C.text }} numberOfLines={1}>
+                              {producto.nombre}
+                            </Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                              {producto.Categoria && (
+                                <Text style={{ fontSize: 10, color: C.muted }} numberOfLines={1}>
+                                  {producto.Categoria.nombre}
+                                </Text>
+                              )}
+                              {tieneVariantes && (
+                                <View style={{ backgroundColor: '#3B82F6', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                                  <Text style={{ fontSize: 9, color: '#FFF', fontWeight: '600' }}>
+                                    {producto.ProductoVariante?.length || 0} variantes
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                          <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: C.primary }}>
+                              ${producto.precio_base.toLocaleString()}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: producto.stock_total > 0 ? C.success : C.danger }}>
+                              Stock: {producto.stock_total}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                    </View>
+                  </ScrollView>
+                )}
+              </View>
+            </View>
+          </ScrollView>
+
+          {/* Botones de acción */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+            <Pressable
+              onPress={onClose}
+              disabled={loading}
+              style={{
+                flex: 1,
+                backgroundColor: C.border,
+                paddingVertical: 12,
+                borderRadius: 10,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>Cancelar</Text>
+            </Pressable>
+            <Pressable
+              onPress={handleCreateOrder}
+              disabled={loading || orderItems.length === 0 || !clienteNombre.trim()}
+              style={{
+                flex: 1,
+                backgroundColor: C.primary,
+                paddingVertical: 12,
+                borderRadius: 10,
+                alignItems: 'center',
+                opacity: loading || orderItems.length === 0 || !clienteNombre.trim() ? 0.5 : 1,
+              }}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>
+                  Crear Pedido (${calculateTotal().toLocaleString()})
+                </Text>
+              )}
+            </Pressable>
+          </View>
+        </View>
+      </View>
+
+      {/* Modal de Selección de Variantes */}
+      {selectingVariantFor && (
+        <Modal visible transparent animationType="fade">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+            <View style={{ backgroundColor: C.card, borderRadius: 12, padding: 16, width: '100%', maxWidth: 400, borderWidth: 1, borderColor: C.border }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: C.text }}>
+                  Seleccionar Variante
+                </Text>
+                <Pressable onPress={() => setSelectingVariantFor(null)}>
+                  <Ionicons name="close" size={24} color={C.text} />
+                </Pressable>
+              </View>
+              
+              <Text style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
+                {selectingVariantFor.nombre}
+              </Text>
+
+              <ScrollView style={{ maxHeight: 300 }} showsVerticalScrollIndicator={false}>
+                <View style={{ gap: 6 }}>
+                  {selectingVariantFor.ProductoVariante?.map((variante) => {
+                    const varianteLabel = getVarianteLabel(variante);
+                    const sinStock = variante.stock <= 0;
+                    const selected = selectedVariantId === variante.id_variante;
+
+                    return (
+                      <Pressable
+                        key={variante.id_variante}
+                        onPress={() => !sinStock && setSelectedVariantId(variante.id_variante)}
+                        disabled={sinStock}
+                        style={{
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: selected ? C.primary : C.border,
+                          backgroundColor: selected ? C.primarySoft : sinStock ? '#11151B' : C.bg,
+                          opacity: sinStock ? 0.5 : 1,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '600', color: sinStock ? C.muted : C.text, textDecorationLine: sinStock ? 'line-through' : 'none' }}>
+                              {varianteLabel}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: sinStock ? '#EF4444' : C.muted, marginTop: 2 }}>
+                              Stock: {variante.stock} unidades {sinStock && '(Sin stock)'}
+                            </Text>
+                          </View>
+                          {selected && !sinStock && (
+                            <Ionicons name="checkmark-circle" size={20} color={C.primary} />
+                          )}
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <Pressable
+                  onPress={() => setSelectingVariantFor(null)}
+                  style={{
+                    flex: 1,
+                    backgroundColor: C.border,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}>Cancelar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={confirmVariantSelection}
+                  disabled={!selectedVariantId}
+                  style={{
+                    flex: 1,
+                    backgroundColor: C.primary,
+                    paddingVertical: 10,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    opacity: selectedVariantId ? 1 : 0.5,
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 13 }}>Agregar</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </Modal>
   );
 }
 
@@ -786,6 +1820,13 @@ const styles = StyleSheet.create({
   },
   detailCardTitle: { color: C.text, fontSize: 16, fontWeight: '700' },
   detailText: { color: C.text, fontSize: 14, marginBottom: 4 },
+  
+  label: {
+    color: C.text,
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
   
   input: {
     backgroundColor: '#11151B',
