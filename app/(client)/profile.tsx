@@ -2,17 +2,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -542,7 +542,10 @@ export default function ProfileScreen() {
               </Text>
             </View>
             {cliente ? (
-              <Button title="Editar" variant="outline" onPress={startEdit} />
+              // BOTÓN EDITAR REEMPLAZADO
+              <Pressable style={styles.headerEditBtn} onPress={startEdit}>
+                <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}>Editar</Text>
+              </Pressable>
             ) : (
               <ActivityIndicator size="small" color={C.primary} />
             )}
@@ -885,6 +888,7 @@ function formatDireccion(c: Cliente | null): string {
   return parts.length ? parts.join(', ') : 'No especificada';
 }
 
+// === COMPONENTE CARD EDITADO ===
 function FavoriteCard({
   fav,
   onRemove,
@@ -907,7 +911,7 @@ function FavoriteCard({
 
   return (
     <View style={styles.favCard}>
-      <Pressable onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <Pressable onPress={onOpen} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 }}>
         <View style={styles.thumbLarge}>
           {img ? (
             <Image source={{ uri: img }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -915,21 +919,26 @@ function FavoriteCard({
             <Ionicons name="image-outline" size={20} color={C.muted} />
           )}
         </View>
-        <View style={{ gap: 4, flex: 1 }}>
-          <Text style={{ color: C.text, fontWeight: '700' }} numberOfLines={1}>
+        <View style={{ gap: 2, flex: 1 }}>
+          <Text style={{ color: C.text, fontWeight: '700', fontSize: 13 }} numberOfLines={2}>
             {p?.nombre ?? 'Producto'}
           </Text>
-          <Text style={{ color: '#A78BFA', fontWeight: '800' }} numberOfLines={1}>
+          <Text style={{ color: '#A78BFA', fontWeight: '800', fontSize: 12 }} numberOfLines={1}>
             {price}
           </Text>
         </View>
       </Pressable>
 
-      <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-        <Button title="Ver" variant="outline" onPress={onOpen} />
-        <Button title="Agregar" onPress={onAdd} />
-        <Pressable onPress={onRemove} hitSlop={8} style={{ paddingHorizontal: 6, justifyContent: 'center' }}>
-          <Ionicons name="heart-dislike-outline" size={18} color="#FCA5A5" />
+      {/* BOTONES CUSTOM "Ver" y "Agregar" */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Pressable style={styles.miniBtnOutline} onPress={onOpen}>
+          <Text style={styles.miniBtnTextOutline}>Ver</Text>
+        </Pressable>
+        <Pressable style={styles.miniBtn} onPress={onAdd}>
+          <Text style={styles.miniBtnText}>Agregar</Text>
+        </Pressable>
+        <Pressable onPress={onRemove} hitSlop={10} style={{ marginLeft: 2 }}>
+          <Ionicons name="heart-dislike-outline" size={20} color="#FCA5A5" />
         </Pressable>
       </View>
     </View>
@@ -1000,6 +1009,7 @@ const styles = StyleSheet.create({
   tabText: { color: C.muted, fontWeight: '600' },
   tabTextActive: { color: C.text, fontWeight: '800' },
 
+  // === CARD FAVORITOS AJUSTADA ===
   favCard: {
     width: '48%',
     backgroundColor: C.card,
@@ -1007,6 +1017,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 10,
+    justifyContent: 'space-between',
   },
   thumbLarge: {
     width: 44,
@@ -1016,6 +1027,48 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+
+  // === ESTILOS DE LOS BOTONES NUEVOS ===
+  miniBtn: {
+    flex: 1,
+    height: 32,
+    backgroundColor: C.primary,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  miniBtnOutline: {
+    flex: 1,
+    height: 32,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    backgroundColor: 'transparent',
+  },
+  miniBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  miniBtnTextOutline: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: C.text,
+  },
+  
+  // === ESTILO DEL BOTON EDITAR (HEADER) ===
+  headerEditBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
 
   orderCard: {

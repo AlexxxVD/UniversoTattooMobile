@@ -27,7 +27,6 @@ export default function AdminLayout() {
     { label: 'Pedidos', href: '/(admin)/orders', icon: { name: 'document-text-outline' } },
     { label: 'Productos', href: '/(admin)/products', icon: { name: 'cube-outline' } },
     { label: 'Clientes', href: '/(admin)/customers', icon: { name: 'people-outline' } },
-    { label: 'Envíos', href: '/(admin)/shipments', icon: { name: 'send-outline' } },
     { label: 'Categorías', href: '/(admin)/categories', icon: { name: 'pricetags-outline' } },
     { label: 'Ajustes', href: '/(admin)/settings', icon: { name: 'settings-outline' } },
   ];
@@ -53,7 +52,6 @@ export default function AdminLayout() {
         <Stack.Screen name="orders" options={{ title: 'Pedidos' }} />
         <Stack.Screen name="products" options={{ title: 'Productos' }} />
         <Stack.Screen name="customers" options={{ title: 'Clientes' }} />
-        <Stack.Screen name="shipments" options={{ title: 'Envíos' }} />
         <Stack.Screen name="categories" options={{ title: 'Categorías' }} />
         <Stack.Screen name="settings" options={{ title: 'Ajustes' }} />
       </Stack>

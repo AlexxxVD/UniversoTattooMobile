@@ -3,20 +3,20 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Alert,
+    FlatList,
+    Image,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -708,18 +708,6 @@ export default function ProductsScreen() {
               ) : null
             }
           />
-
-          {/* Botón flotante "Añadir producto" */}
-          <Pressable
-            onPress={() => setShowCreateModal(true)}
-            style={({ pressed }) => [
-              styles.fab,
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <Ionicons name="add-circle" size={26} color="#fff" />
-            <Text style={{ color: '#fff', fontWeight: '700' }}>Añadir</Text>
-          </Pressable>
         </>
       )}
 
@@ -1164,82 +1152,6 @@ function ProductCard({
               <Text style={styles.metaDim}>
                 Actualizado: {new Date((item as any).fecha_actualizacion).toLocaleDateString('es-AR')}
               </Text>
-            )}
-          </View>
-
-          {/* Menú de acciones */}
-          <View>
-            <Pressable
-              onPress={() => setShowMenu(true)}
-              style={({ pressed }) => [{ padding: 4, opacity: pressed ? 0.6 : 1 }]}
-            >
-              <Ionicons name="ellipsis-vertical" size={20} color={C.muted} />
-            </Pressable>
-
-            {showMenu && (
-              <Modal
-                visible={showMenu}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setShowMenu(false)}
-              >
-                <Pressable style={styles.menuOverlay} onPress={() => setShowMenu(false)}>
-                  <View style={styles.menuContent}>
-                    {/* Toggle destacado */}
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.menuItem,
-                        pressed && { backgroundColor: C.primarySoft },
-                      ]}
-                      onPress={() => {
-                        setShowMenu(false);
-                        onToggleFeatured(id, isFeatured);
-                      }}
-                      disabled={togglingFeatured === id}
-                    >
-                      <Ionicons name={isFeatured ? 'star' : 'star-outline'} size={20} color={C.yellow} />
-                      <Text style={styles.menuItemText}>
-                        {isFeatured ? 'Quitar destacado' : 'Marcar destacado'}
-                      </Text>
-                    </Pressable>
-
-                    {/* Editar */}
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.menuItem,
-                        pressed && { backgroundColor: C.primarySoft },
-                      ]}
-                      onPress={() => {
-                        setShowMenu(false);
-                        Toast.show({
-                          type: 'info',
-                          text1: 'Próximamente',
-                          text2: 'Modal de edición en desarrollo',
-                        });
-                      }}
-                    >
-                      <Ionicons name="create-outline" size={20} color={C.primary} />
-                      <Text style={styles.menuItemText}>Editar</Text>
-                    </Pressable>
-
-                    {/* Eliminar */}
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.menuItem,
-                        pressed && { backgroundColor: 'rgba(239,68,68,0.1)' },
-                      ]}
-                      onPress={() => {
-                        setShowMenu(false);
-                        onDelete(id, nombre);
-                      }}
-                      disabled={deleting === id}
-                    >
-                      <Ionicons name="trash-outline" size={20} color={C.danger} />
-                      <Text style={[styles.menuItemText, { color: C.danger }]}>Eliminar</Text>
-                    </Pressable>
-                  </View>
-                </Pressable>
-              </Modal>
             )}
           </View>
         </View>

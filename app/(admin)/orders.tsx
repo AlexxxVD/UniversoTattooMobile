@@ -208,21 +208,6 @@ export default function OrdersScreen() {
             <View style={{ gap: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={styles.title}>Pedidos</Text>
-                <Pressable
-                  onPress={() => setShowCreateModal(true)}
-                  style={{
-                    backgroundColor: C.primary,
-                    paddingHorizontal: 14,
-                    paddingVertical: 8,
-                    borderRadius: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                  }}
-                >
-                  <Ionicons name="add-circle-outline" size={18} color="#FFF" />
-                  <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 13 }}>Nuevo</Text>
-                </Pressable>
               </View>
 
               {/* Buscador */}
@@ -1448,11 +1433,6 @@ function OrderCard({ item, onPress }: { item: PedidoConCliente; onPress: () => v
           </Text>
         </View>
       </View>
-
-      {/* Indicador de "ver más" */}
-      <View style={{ position: 'absolute', right: 8, top: 8 }}>
-        <Ionicons name="chevron-forward" size={16} color={C.muted} />
-      </View>
     </Pressable>
   );
 }
@@ -1528,12 +1508,12 @@ function OrderDetailsModal({
       <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
           {/* Header */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingRight: 4 }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={styles.modalTitle}>Pedido #{order.numero_pedido}</Text>
               <Text style={styles.metaText}>{formatDate(order.fecha_pedido)}</Text>
             </View>
-            <Pressable onPress={onClose} hitSlop={8}>
+            <Pressable onPress={onClose} hitSlop={8} style={{ marginTop: -4 }}>
               <Ionicons name="close" size={28} color={C.text} />
             </Pressable>
           </View>
@@ -1584,70 +1564,38 @@ function OrderDetailsModal({
             </View>
           )}
 
-          {/* Estado del Pedido - Editable */}
+          {/* Estado del Pedido - Solo lectura */}
           <View style={styles.detailCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <Ionicons name="cube" size={18} color={C.primary} />
               <Text style={styles.detailCardTitle}>Estado del Pedido</Text>
             </View>
             
-            <View style={{ gap: 8 }}>
-              {['PENDIENTE', 'CONFIRMADO', 'PREPARANDO', 'ENVIADO', 'ENTREGADO', 'CANCELADO'].map((estado) => (
-                <Pressable
-                  key={estado}
-                  onPress={() => setEditData({ ...editData, estado: estado as EstadoPedido })}
-                  style={[
-                    styles.radioButton,
-                    editData.estado === estado && styles.radioButtonSelected,
-                  ]}
-                >
-                  <View style={styles.radioCircle}>
-                    {editData.estado === estado && <View style={styles.radioCircleInner} />}
-                  </View>
-                  <Text style={[styles.radioText, editData.estado === estado && styles.radioTextSelected]}>
-                    {statusBadge(estado).label}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={{ padding: 12, backgroundColor: C.card, borderRadius: 8, borderWidth: 1, borderColor: C.border }}>
+              <Text style={[styles.detailText, { fontSize: 16, fontWeight: '600' }]}>
+                {statusBadge(order.estado).label}
+              </Text>
             </View>
           </View>
 
-          {/* Estado de Pago - Editable */}
+          {/* Estado de Pago - Solo lectura */}
           <View style={styles.detailCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <Ionicons name="card" size={18} color={C.primary} />
               <Text style={styles.detailCardTitle}>Estado de Pago</Text>
             </View>
             
-            <View style={{ gap: 8, marginBottom: 12 }}>
-              {['PENDIENTE', 'PAGADO', 'FALLIDO', 'REEMBOLSADO', 'PARCIAL'].map((estado) => (
-                <Pressable
-                  key={estado}
-                  onPress={() => setEditData({ ...editData, estado_pago: estado as EstadoPago })}
-                  style={[
-                    styles.radioButton,
-                    editData.estado_pago === estado && styles.radioButtonSelected,
-                  ]}
-                >
-                  <View style={styles.radioCircle}>
-                    {editData.estado_pago === estado && <View style={styles.radioCircleInner} />}
-                  </View>
-                  <Text style={[styles.radioText, editData.estado_pago === estado && styles.radioTextSelected]}>
-                    {paymentBadge(estado).label}
-                  </Text>
-                </Pressable>
-              ))}
+            <View style={{ padding: 12, backgroundColor: C.card, borderRadius: 8, borderWidth: 1, borderColor: C.border, marginBottom: 12 }}>
+              <Text style={[styles.detailText, { fontSize: 16, fontWeight: '600' }]}>
+                {paymentBadge(order.estado_pago).label}
+              </Text>
             </View>
 
             <View style={{ marginTop: 12 }}>
               <Text style={[styles.detailText, { marginBottom: 6 }]}>Método de Pago</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Ej: Transferencia, Efectivo, Mercado Pago"
-                placeholderTextColor={C.muted}
-                value={editData.metodo_pago}
-                onChangeText={(text) => setEditData({ ...editData, metodo_pago: text })}
-              />
+              <View style={{ padding: 12, backgroundColor: C.card, borderRadius: 8, borderWidth: 1, borderColor: C.border }}>
+                <Text style={styles.detailText}>{order.metodo_pago || 'No especificado'}</Text>
+              </View>
             </View>
           </View>
 
@@ -1724,30 +1672,6 @@ function OrderDetailsModal({
             </View>
           )}
 
-          {/* Botones de acción */}
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
-            <Pressable
-              style={[styles.actionButton, { flex: 1, backgroundColor: C.border }]}
-              onPress={onClose}
-            >
-              <Text style={[styles.actionButtonText, { color: C.text }]}>Cancelar</Text>
-            </Pressable>
-            
-            <Pressable
-              style={[styles.actionButton, { flex: 1, backgroundColor: C.primary }]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="#FFF" />
-              ) : (
-                <>
-                  <Ionicons name="save-outline" size={18} color="#FFF" />
-                  <Text style={styles.actionButtonText}>Guardar Cambios</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
         </ScrollView>
       </SafeAreaView>
     </Modal>

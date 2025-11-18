@@ -3,17 +3,17 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { apiPost } from '../../lib/api';
@@ -301,17 +301,6 @@ export default function CheckoutScreen() {
   }, [items, subtotal, discount, shippingCost, shippingMethod, isFreeShippingEligible]);
 
   useEffect(() => {
-    const USE_WEB = process.env.EXPO_PUBLIC_USE_WEB_API_CHECKOUT === '1';
-    const API_BASE = process.env.EXPO_PUBLIC_API_BASE;
-    console.log('[checkout] mounted', {
-      USE_WEB,
-      API_BASE,
-      items: items.length,
-      subtotal,
-      discount,
-      shippingMethod,
-      paymentMethod,
-    });
     setDbgStep('mounted');
   }, []); // intencional: solo al montar
 
@@ -336,7 +325,6 @@ export default function CheckoutScreen() {
           }
 
           if (cliente) {
-            console.log('[checkout] Datos del cliente cargados:', cliente);
             setFormData((prev) => ({
               ...prev,
               email: prev.email || cliente.email || user.email || '',
@@ -411,14 +399,6 @@ export default function CheckoutScreen() {
       const operativa = shippingMethod === 'branch' ? '414610' : '414609';
 
       try {
-        console.log('[checkout] cotizar input', {
-          pesoTotal,
-          volumenTotal,
-          cpDestino: formData.postalCode,
-          paquetes: Math.max(1, orderSummary.items.length),
-          valorDeclarado: Math.max(100, Math.round(orderSummary.subtotal)),
-          operativa,
-        });
         const cot = await ocaCotizar({
           pesoTotal,
           volumenTotal,
@@ -430,11 +410,12 @@ export default function CheckoutScreen() {
           useTest: false,
         });
 
-        console.log('[checkout] cotizar resp', cot);
         if (cot.ok && cot.data?.length) {
           const opt = cot.data[0];
           setSelectedShippingOption({ ...opt, operativa });
-          setShippingCost(isFreeShippingEligible ? 0 : (opt.precio ?? 0));
+          // OCA devuelve el precio en centavos, convertir a pesos
+          const precioEnPesos = (opt.precio ?? 0) / 100;
+          setShippingCost(isFreeShippingEligible ? 0 : precioEnPesos);
           setDbgStep('shipping:calc:ok');
         } else {
           setSelectedShippingOption(null);
@@ -487,7 +468,6 @@ export default function CheckoutScreen() {
     try {
       setDbgStep('branches:load:start');
       const resp = await ocaSucursales(formData.postalCode, false);
-      console.log('[checkout] sucursales resp', resp);
       if (resp.ok && resp.data) {
         setBranches(resp.data);
         setBranchModalVisible(true);
@@ -606,26 +586,15 @@ export default function CheckoutScreen() {
   const handleSubmit = async () => {
     setDbgError(null);
     setDbgStep('submit:start');
-    console.log('[checkout] submit:start', {
-      items: orderSummary.items.length,
-      paymentMethod,
-      shippingMethod,
-      subtotal,
-      discount,
-      shippingCost,
-      total: orderSummary.total,
-    });
 
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.dni) {
       setDbgStep('validate:basic:fail');
-      console.warn('[checkout] validate basic fail');
       Alert.alert('Campos requeridos', 'Completá nombre, apellido, email, teléfono y DNI.');
       return;
     }
     if (shippingMethod !== 'pickup') {
       if (!formData.calle || !formData.numero || !formData.city || !formData.province || !formData.postalCode) {
         setDbgStep('validate:address:fail');
-        console.warn('[checkout] validate address fail');
         Alert.alert('Dirección requerida', 'Completá los datos de envío.');
         return;
       }
@@ -740,7 +709,6 @@ export default function CheckoutScreen() {
           notes: formData.notes || null,
         };
 
-        console.log('[checkout] POST /api/orders payload', orderPayload);
         setDbgStep('webapi:create-order');
 
         // 2. Crear orden
@@ -748,7 +716,6 @@ export default function CheckoutScreen() {
           '/api/orders',
           orderPayload
         );
-        console.log('[checkout] /api/orders resp COMPLETO:', JSON.stringify(orderRes, null, 2));
 
         // La API puede devolver diferentes formatos
         const orderNumber = 
@@ -763,16 +730,13 @@ export default function CheckoutScreen() {
           orderRes?.data?.numero_pedido;
 
         if (!orderNumber) {
-          console.error('[checkout] No se encontró order_number en la respuesta:', orderRes);
           throw new Error(`No se recibió el número de pedido. Respuesta: ${JSON.stringify(orderRes)}`);
         }
 
-        console.log('[checkout] Order number obtenido:', orderNumber);
         setDbgStep('webapi:order-created');
 
         // 3. Si es Mercado Pago, crear preferencia y redirigir
         if (paymentMethod === 'mercadopago') {
-          console.log('[checkout] Creating MP preference...');
           setDbgStep('webapi:create-preference');
 
           const preferencePayload = {
@@ -785,15 +749,6 @@ export default function CheckoutScreen() {
               const validUnitPrice = Number.isFinite(unitPrice) && unitPrice > 0 
                 ? Math.round(unitPrice * 100) / 100 
                 : 1;
-              
-              console.log('[checkout] Item para MP:', {
-                name: it.name,
-                price: it.price,
-                unitPrice,
-                validUnitPrice,
-                quantity,
-                valid: Number.isFinite(unitPrice) && unitPrice > 0
-              });
 
               return {
                 id: it.id || `item_${Math.random()}`,
@@ -811,17 +766,13 @@ export default function CheckoutScreen() {
             total: orderSummary.total,
           };
 
-          console.log('[checkout] Preference payload:', JSON.stringify(preferencePayload, null, 2));
-
           const prefRes = await apiPost<{ init_point?: string; sandbox_init_point?: string }>(
             '/api/create-preference',
             preferencePayload
           );
-          console.log('[checkout] /api/create-preference resp', prefRes);
 
           if (prefRes?.init_point || prefRes?.sandbox_init_point) {
             const redirectUrl = prefRes.init_point || prefRes.sandbox_init_point;
-            console.log('[checkout] opening browser', redirectUrl);
             setDbgStep('webapi:redirecting-mp');
             
             await WebBrowser.openBrowserAsync(redirectUrl!);
@@ -881,7 +832,6 @@ export default function CheckoutScreen() {
   };
 
   if (items.length === 0) {
-    console.log('[checkout] render: empty cart');
     return (
       <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
         <View style={styles.emptyRoot}>
@@ -966,7 +916,7 @@ export default function CheckoutScreen() {
                       <Text style={styles.text}>OCA {selectedShippingOption.descripcion || 'Envío'}</Text>
                       <Text style={styles.mutedText}>{selectedShippingOption.plazoEntrega || 'Plazo estimado'}</Text>
                     </View>
-                    <Text style={styles.textStrong}>{isFreeShippingEligible ? 'Gratis' : money(selectedShippingOption.precio || 0)}</Text>
+                    <Text style={styles.textStrong}>{isFreeShippingEligible ? 'Gratis' : money((selectedShippingOption.precio || 0) / 100)}</Text>
                   </View>
                 ) : (
                   <Text style={styles.infoBlue}>
@@ -1066,7 +1016,7 @@ export default function CheckoutScreen() {
                   : selectedShippingOption
                   ? isFreeShippingEligible
                     ? 'Gratis'
-                    : money(selectedShippingOption.precio || 0)
+                    : money((selectedShippingOption.precio || 0) / 100)
                   : 'A definir'}
               </Text>
             </View>

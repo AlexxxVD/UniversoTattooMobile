@@ -3,17 +3,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
-  FlatList,
-  Image,
-  Linking,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions
+    Animated,
+    FlatList,
+    Image,
+    Linking,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
+    useWindowDimensions
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { API_BASE } from '../../lib/api';
@@ -51,21 +51,15 @@ const localImages: { [key: string]: any } = {
   '/img/amaitattoo.webp': require('../../assets/images/amaitattoo.webp'),
 };
 
-console.log('📦 [index] Imágenes locales cargadas:', Object.keys(localImages));
-
 // Función para cargar imágenes (locales primero, servidor como fallback)
 function img(src: string): any {
-  console.log('🖼️ [img] Solicitando:', src);
   
   if (/^https?:\/\//i.test(src)) {
-    console.log('✅ [img] URL absoluta, retornando:', { uri: src });
     return { uri: src };
   }
   
   const cleanPath = src.replace(/^\//, '');
   const withSlash = `/${cleanPath}`;
-  
-  console.log('🔍 [img] Buscando en local:', { cleanPath, withSlash });
   
   // Buscar en assets locales (con o sin slash inicial)
   // IMPORTANTE: require() ya retorna el asset source correcto para React Native
