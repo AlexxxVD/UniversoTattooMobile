@@ -2,17 +2,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';

@@ -3,12 +3,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-  Linking,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+    Linking,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    View,
 } from 'react-native';
 
 import { Screen } from '@/components/layout/Screen';

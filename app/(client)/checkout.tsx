@@ -3,17 +3,17 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { apiPost } from '../../lib/api';
@@ -781,25 +781,32 @@ export default function CheckoutScreen() {
               const unitPrice = Number(it.price);
               const quantity = Number(it.quantity);
               
+              // MercadoPago requiere unit_price con máximo 2 decimales y > 0
+              const validUnitPrice = Number.isFinite(unitPrice) && unitPrice > 0 
+                ? Math.round(unitPrice * 100) / 100 
+                : 1;
+              
               console.log('[checkout] Item para MP:', {
                 name: it.name,
                 price: it.price,
                 unitPrice,
+                validUnitPrice,
                 quantity,
                 valid: Number.isFinite(unitPrice) && unitPrice > 0
               });
 
               return {
-                title: it.name || 'Producto',
+                id: it.id || `item_${Math.random()}`,
+                name: it.name || 'Producto',
                 quantity: quantity > 0 ? quantity : 1,
-                unit_price: Number.isFinite(unitPrice) && unitPrice > 0 ? unitPrice : 1,
+                price: validUnitPrice,
               };
             }),
             payer: {
-              name: formData.firstName,
-              surname: formData.lastName,
+              firstName: formData.firstName,
+              lastName: formData.lastName,
               email: formData.email,
-              phone: { number: formData.phone },
+              phone: formData.phone,
             },
             total: orderSummary.total,
           };

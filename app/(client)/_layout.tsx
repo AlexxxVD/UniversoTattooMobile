@@ -80,14 +80,17 @@ export default function ClientLayout() {
   // - Perfil (incluye sección de Favoritos dentro)
   // - Sobre nosotros
   // - Contacto
-  // Nota: devoluciones, envios, preguntas-frecuentes y terminos-y-condiciones
-  // no aparecen en el menú pero son accesibles via navegación directa
+  // - Información Legal (devoluciones, envíos, preguntas frecuentes, términos y condiciones)
   const items = [
     { label: 'Inicio', href: '/(client)', icon: { name: 'home-outline' } },
     { label: 'Tienda', href: '/(client)/store', icon: { name: 'storefront-outline' } },
     { label: 'Perfil', href: '/(client)/profile', icon: { name: 'person-outline' } },
     { label: 'Sobre nosotros', href: '/(client)/about', icon: { name: 'information-circle-outline' } },
     { label: 'Contacto', href: '/(client)/contact', icon: { name: 'mail-outline' } },
+    { label: 'Devoluciones', href: '/(client)/devoluciones', icon: { name: 'arrow-undo-outline' } },
+    { label: 'Envíos', href: '/(client)/envios', icon: { name: 'cube-outline' } },
+    { label: 'Preguntas Frecuentes', href: '/(client)/preguntas-frecuentes', icon: { name: 'help-circle-outline' } },
+    { label: 'Términos y Condiciones', href: '/(client)/terminos-y-condiciones', icon: { name: 'document-text-outline' } },
   ];
 
   const handleLogout = async () => {

@@ -5,18 +5,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Linking,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
@@ -181,8 +180,8 @@ export default function RegisterScreen() {
     }
   };
 
-  const openTerms = () => Linking.openURL('https://tu-dominio.com/terminos');
-  const openPrivacy = () => Linking.openURL('https://tu-dominio.com/privacidad');
+  const openTerms = () => router.push('/(client)/terminos-y-condiciones');
+  const openPrivacy = () => router.push('/(client)/terminos-y-condiciones');
 
   if (checkingSession) {
     return (

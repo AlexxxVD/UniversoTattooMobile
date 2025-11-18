@@ -2,19 +2,19 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
 
-import { Card } from '../../components/ui/Card';
+import { Card } from '@/components/ui/Card';
 import { useCartStore } from '../../lib/cart-store';
 import { Tables } from '../../lib/database.types';
 import { supabase } from '../../lib/supabase';

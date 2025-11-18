@@ -2,16 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Image,
-  Linking,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Image,
+    Linking,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';

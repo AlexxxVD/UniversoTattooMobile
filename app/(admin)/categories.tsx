@@ -2,16 +2,16 @@ import { useRouter } from 'expo-router';
 import { MoreVertical, PlusCircle } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    RefreshControl,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
