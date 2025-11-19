@@ -3,17 +3,17 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { apiPost } from '../../lib/api';
@@ -152,60 +152,6 @@ async function getProvinceByPostalCode(code: string): Promise<string> {
 type ShippingMethod = 'delivery' | 'branch' | 'pickup';
 type PaymentMethod = 'mercadopago' | 'transfer' | 'cash';
 
-// Overlay simple de debug (se muestra solo si EXPO_PUBLIC_DEBUG_CHECKOUT=1)
-function CheckoutDebug({
-  step,
-  error,
-  extra,
-  onClear,
-}: {
-  step?: string;
-  error?: string | null;
-  extra?: Record<string, any>;
-  onClear?: () => void;
-}) {
-  const show = process.env.EXPO_PUBLIC_DEBUG_CHECKOUT === '1';
-  if (!show) return null;
-  return (
-    <View style={{ position: 'absolute', left: 12, right: 12, bottom: 12 }}>
-      <View style={{ backgroundColor: C.card, borderColor: C.border, borderWidth: 1, borderRadius: 12, padding: 10 }}>
-        <Text style={{ color: '#C4B5FD', fontWeight: '900', marginBottom: 6 }}>Checkout Debug</Text>
-        {!!step && (
-          <Text style={{ color: C.text }}>
-            Paso: <Text style={{ fontFamily: 'monospace' }}>{step}</Text>
-          </Text>
-        )}
-        {!!error && (
-          <Text style={{ color: '#FCA5A5' }}>
-            Error: <Text style={{ fontFamily: 'monospace' }}>{error}</Text>
-          </Text>
-        )}
-        {!!extra &&
-          Object.entries(extra).map(([k, v]) => (
-            <Text key={k} style={{ color: C.muted }}>
-              {k}: <Text style={{ fontFamily: 'monospace' }}>{safe(v)}</Text>
-            </Text>
-          ))}
-        <Pressable
-          onPress={onClear}
-          style={({ pressed }) => [
-            {
-              marginTop: 8,
-              alignSelf: 'flex-start',
-              backgroundColor: C.primary,
-              borderRadius: 8,
-              paddingHorizontal: 10,
-              paddingVertical: 8,
-            },
-            pressed && { opacity: 0.9 },
-          ]}
-        >
-          <Text style={{ color: '#fff', fontWeight: '800' }}>Limpiar</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
 function safe(v: any) {
   try {
     if (typeof v === 'string') return v;
@@ -253,9 +199,6 @@ export default function CheckoutScreen() {
 
   const [provPicker, setProvPicker] = useState(false);
 
-  const [dbgStep, setDbgStep] = useState<string>('mounted');
-  const [dbgError, setDbgError] = useState<string | null>(null);
-
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -301,14 +244,12 @@ export default function CheckoutScreen() {
   }, [items, subtotal, discount, shippingCost, shippingMethod, isFreeShippingEligible]);
 
   useEffect(() => {
-    setDbgStep('mounted');
   }, []); // intencional: solo al montar
 
   useEffect(() => {
     const loadProfile = async () => {
       try {
         setIsLoadingProfile(true);
-        setDbgStep('profile:load:start');
         const { data: ses } = await supabase.auth.getSession();
         const user = ses.session?.user;
         
@@ -349,11 +290,8 @@ export default function CheckoutScreen() {
           }
         }
         setProfileLoaded(true);
-        setDbgStep('profile:load:done');
       } catch (e: any) {
         console.warn('[checkout] profile load error:', e?.message ?? e);
-        setDbgError(e?.message ?? String(e));
-        setDbgStep('profile:load:error');
       } finally {
         setIsLoadingProfile(false);
       }
@@ -365,7 +303,6 @@ export default function CheckoutScreen() {
     const run = async () => {
       const cp = formData.postalCode;
       if (/^\d{4}$/.test(cp)) {
-        setDbgStep('province:resolve');
         const prov = await getProvinceByPostalCode(cp);
         setFormData((p) => ({ ...p, province: prov === 'Consultar' ? p.province : prov }));
         setProvinceError(prov === 'Consultar' ? 'No se pudo determinar la provincia. Seleccionala manualmente.' : '');
@@ -379,20 +316,17 @@ export default function CheckoutScreen() {
   useEffect(() => {
     const calc = async () => {
       if (shippingMethod === 'pickup') {
-        setDbgStep('shipping:pickup');
         setSelectedShippingOption(null);
         setShippingCost(0);
         return;
       }
       if (!/^\d{4}$/.test(formData.postalCode)) {
-        setDbgStep('shipping:skip:cp');
         setSelectedShippingOption(null);
         setShippingCost(0);
         return;
       }
 
       setIsCalculatingShipping(true);
-      setDbgStep('shipping:calc:start');
 
       const pesoTotal = Math.max(0.1, orderSummary.items.reduce((acc, _) => acc + 0.2, 0));
       const volumenTotal = Math.max(0.001, orderSummary.items.reduce((acc, _) => acc + 0.002, 0));
@@ -413,22 +347,16 @@ export default function CheckoutScreen() {
         if (cot.ok && cot.data?.length) {
           const opt = cot.data[0];
           setSelectedShippingOption({ ...opt, operativa });
-          // OCA devuelve el precio en centavos, convertir a pesos
-          const precioEnPesos = (opt.precio ?? 0) / 100;
-          setShippingCost(isFreeShippingEligible ? 0 : precioEnPesos);
-          setDbgStep('shipping:calc:ok');
+          setShippingCost(isFreeShippingEligible ? 0 : (opt.precio ?? 0));
         } else {
           setSelectedShippingOption(null);
           setShippingCost(0);
-          setDbgStep('shipping:calc:none');
         }
       } catch (e: unknown) {
         const msg = getErrMsg(e);
         console.warn('[checkout] cotizar error:', msg, e);
-        setDbgError(msg);
         setSelectedShippingOption(null);
         setShippingCost(0);
-        setDbgStep('shipping:calc:error');
       } finally {
         setIsCalculatingShipping(false);
       }
@@ -445,14 +373,12 @@ export default function CheckoutScreen() {
         setPostalCodeError('');
         setSelectedShippingOption(null);
         setShippingCost(0);
-        setDbgStep('cp:clear');
         return;
       }
       setIsValidatingPostalCode(true);
       validatePostalCode(cleaned)
         .then((ok) => {
           setPostalCodeError(ok ? '' : 'Código postal inválido');
-          setDbgStep(ok ? 'cp:valid' : 'cp:invalid');
         })
         .finally(() => setIsValidatingPostalCode(false));
     } else {
@@ -466,27 +392,21 @@ export default function CheckoutScreen() {
       return;
     }
     try {
-      setDbgStep('branches:load:start');
       const resp = await ocaSucursales(formData.postalCode, false);
       if (resp.ok && resp.data) {
         setBranches(resp.data);
         setBranchModalVisible(true);
-        setDbgStep('branches:load:ok');
       } else {
         Alert.alert('Sucursales', 'No se encontraron sucursales para ese CP.');
-        setDbgStep('branches:load:none');
       }
     } catch (e: unknown) {
       const msg = getErrMsg(e);
       console.warn('[checkout] sucursales error:', msg, e);
-      setDbgError(msg);
       Alert.alert('Sucursales', 'No se pudieron obtener sucursales.');
-      setDbgStep('branches:load:error');
     }
   };
 
   async function createOrderInSupabaseFallback() {
-    setDbgStep('fallback:supabase:start');
     const { data: ses } = await supabase.auth.getSession();
     const user = ses.session?.user;
 
@@ -517,7 +437,6 @@ export default function CheckoutScreen() {
           .single();
         if (cliErr) {
           console.error('[checkout] cliente insert error:', cliErr);
-          setDbgError(cliErr.message ?? String(cliErr));
           throw cliErr;
         }
         cliente = newCli;
@@ -560,7 +479,6 @@ export default function CheckoutScreen() {
       .single();
     if (pedErr) {
       console.error('[checkout] pedido insert error:', pedErr);
-      setDbgError(pedErr.message ?? String(pedErr));
       throw pedErr;
     }
 
@@ -575,31 +493,23 @@ export default function CheckoutScreen() {
     const { error: ppErr } = await supabase.from('PedidoProducto').insert(rows);
     if (ppErr) {
       console.error('[checkout] pedidoProducto insert error:', ppErr);
-      setDbgError(ppErr.message ?? String(ppErr));
       throw ppErr;
     }
-
-    setDbgStep('fallback:supabase:done');
     return { numeroPedido };
   }
 
   const handleSubmit = async () => {
-    setDbgError(null);
-    setDbgStep('submit:start');
 
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone || !formData.dni) {
-      setDbgStep('validate:basic:fail');
       Alert.alert('Campos requeridos', 'Completá nombre, apellido, email, teléfono y DNI.');
       return;
     }
     if (shippingMethod !== 'pickup') {
       if (!formData.calle || !formData.numero || !formData.city || !formData.province || !formData.postalCode) {
-        setDbgStep('validate:address:fail');
         Alert.alert('Dirección requerida', 'Completá los datos de envío.');
         return;
       }
       if (!(await validatePostalCode(formData.postalCode)) || postalCodeError) {
-        setDbgStep('validate:cp:fail');
         console.warn('[checkout] validate cp fail', { postalCode: formData.postalCode, postalCodeError });
         Alert.alert('Código postal inválido', 'Ingresá un código postal de 4 dígitos válido.');
         return;
@@ -607,32 +517,27 @@ export default function CheckoutScreen() {
       // Si no hay tarifa para delivery y no aplica envío gratis, permitimos continuar
       if (shippingMethod === 'delivery' && !isFreeShippingEligible && !selectedShippingOption) {
         console.warn('[checkout] sin tarifa OCA, continuando con envío a definir');
-        setDbgStep('validate:shippingOption:warn');
         // placeholder para coherencia de payload
         setSelectedShippingOption({ precio: 0, descripcion: 'A cotizar', operativa: 'PENDIENTE' } as any);
         // No retornamos: dejamos seguir
       }
       if (shippingMethod === 'branch' && !selectedBranch) {
-        setDbgStep('validate:branch:fail');
         console.warn('[checkout] validate branch fail');
         Alert.alert('Sucursal requerida', 'Seleccioná una sucursal OCA.');
         return;
       }
     }
     if (paymentMethod === 'cash' && shippingMethod !== 'pickup') {
-      setDbgStep('validate:cash:fail');
       console.warn('[checkout] validate cash fail');
       Alert.alert('Combinación no válida', 'El pago en efectivo solo está disponible para retiro en tienda.');
       return;
     }
     if (!acceptTerms) {
-      setDbgStep('validate:terms:fail');
       console.warn('[checkout] validate terms fail');
       Alert.alert('Términos', 'Debés aceptar los términos y condiciones.');
       return;
     }
     if (orderSummary.items.some((i) => i.quantity > i.stock && i.stock < 999)) {
-      setDbgStep('validate:stock:fail');
       console.warn('[checkout] validate stock fail');
       Alert.alert('Stock insuficiente', 'Hay productos sin stock suficiente.');
       return;
@@ -643,7 +548,6 @@ export default function CheckoutScreen() {
       // Usar APIs web si está configurado
       if (USE_WEB_API_CHECKOUT) {
         setIsProcessing(true);
-        setDbgStep('webapi:build-payload');
 
         // 1. Preparar payload para crear orden
         const orderPayload = {
@@ -709,8 +613,6 @@ export default function CheckoutScreen() {
           notes: formData.notes || null,
         };
 
-        setDbgStep('webapi:create-order');
-
         // 2. Crear orden
         const orderRes = await apiPost<any>(
           '/api/orders',
@@ -733,30 +635,36 @@ export default function CheckoutScreen() {
           throw new Error(`No se recibió el número de pedido. Respuesta: ${JSON.stringify(orderRes)}`);
         }
 
-        setDbgStep('webapi:order-created');
-
         // 3. Si es Mercado Pago, crear preferencia y redirigir
         if (paymentMethod === 'mercadopago') {
-          setDbgStep('webapi:create-preference');
 
           const preferencePayload = {
             order_number: orderNumber,
-            items: orderSummary.items.map((it) => {
-              const unitPrice = Number(it.price);
-              const quantity = Number(it.quantity);
-              
-              // MercadoPago requiere unit_price con máximo 2 decimales y > 0
-              const validUnitPrice = Number.isFinite(unitPrice) && unitPrice > 0 
-                ? Math.round(unitPrice * 100) / 100 
-                : 1;
+            items: [
+              ...orderSummary.items.map((it) => {
+                const unitPrice = Number(it.price);
+                const quantity = Number(it.quantity);
+                
+                // MercadoPago requiere unit_price con máximo 2 decimales y > 0
+                const validUnitPrice = Number.isFinite(unitPrice) && unitPrice > 0 
+                  ? Math.round(unitPrice * 100) / 100 
+                  : 1;
 
-              return {
-                id: it.id || `item_${Math.random()}`,
-                name: it.name || 'Producto',
-                quantity: quantity > 0 ? quantity : 1,
-                price: validUnitPrice,
-              };
-            }),
+                return {
+                  id: it.id || `item_${Math.random()}`,
+                  name: it.name || 'Producto',
+                  quantity: quantity > 0 ? quantity : 1,
+                  price: validUnitPrice,
+                };
+              }),
+              // Agregar envío como item si corresponde
+              ...(orderSummary.shipping > 0 ? [{
+                id: 'shipping',
+                name: 'Envío',
+                quantity: 1,
+                price: Math.round(orderSummary.shipping * 100) / 100,
+              }] : []),
+            ],
             payer: {
               firstName: formData.firstName,
               lastName: formData.lastName,
@@ -773,25 +681,28 @@ export default function CheckoutScreen() {
 
           if (prefRes?.init_point || prefRes?.sandbox_init_point) {
             const redirectUrl = prefRes.init_point || prefRes.sandbox_init_point;
-            setDbgStep('webapi:redirecting-mp');
             
-            await WebBrowser.openBrowserAsync(redirectUrl!);
+            // Abrir MercadoPago y esperar el resultado
+            const result = await WebBrowser.openBrowserAsync(redirectUrl!);
+            
+            // Si el usuario cancela o cierra, no limpiar el carrito
+            if (result.type === 'cancel' || result.type === 'dismiss') {
+              Alert.alert(
+                'Pago cancelado',
+                'No completaste el pago. Podés intentarlo nuevamente cuando quieras.',
+                [{ text: 'OK' }]
+              );
+              return;
+            }
+            
+            // Solo limpiar el carrito si completó el proceso
             clearCart();
             
-            Alert.alert(
-              'Continuá el pago',
-              'Te redirigimos a Mercado Pago. Una vez finalizado el pago, tu pedido será procesado.',
-              [
-                {
-                  text: 'Ver mis pedidos',
-                  onPress: () => router.replace('/(client)/profile'),
-                },
-                {
-                  text: 'Volver al inicio',
-                  onPress: () => router.replace('/(client)'),
-                },
-              ]
-            );
+            // Redirigir a pantalla de confirmación (pendiente hasta que MercadoPago confirme)
+            router.replace({
+              pathname: '/(client)/pago/pendiente' as any,
+              params: { order_number: orderNumber },
+            });
             return;
           } else {
             throw new Error('No se pudo obtener el link de pago de Mercado Pago');
@@ -799,7 +710,6 @@ export default function CheckoutScreen() {
         } else {
           // 4. Para transferencia o efectivo, mostrar confirmación
           clearCart();
-          setDbgStep('webapi:order-done');
           
           // Redirigir a la pantalla de confirmación
           router.replace('/(client)');
@@ -814,16 +724,12 @@ export default function CheckoutScreen() {
       }
 
       // Fallback: crear orden directamente en Supabase (sin API web)
-      setDbgStep('fallback:start');
       const { numeroPedido } = await createOrderInSupabaseFallback();
       clearCart();
       Alert.alert('Pedido creado', `Tu pedido ${numeroPedido} fue generado correctamente.`);
-      setDbgStep('fallback:done');
       router.replace('/(client)');
     } catch (e: any) {
       console.error('Checkout error:', e?.message ?? e);
-      setDbgError(e?.message ?? String(e));
-      setDbgStep('error');
       Alert.alert('Error', e?.message ?? 'No se pudo completar la compra.');
     } finally {
       setIsSubmitting(false);
@@ -916,7 +822,7 @@ export default function CheckoutScreen() {
                       <Text style={styles.text}>OCA {selectedShippingOption.descripcion || 'Envío'}</Text>
                       <Text style={styles.mutedText}>{selectedShippingOption.plazoEntrega || 'Plazo estimado'}</Text>
                     </View>
-                    <Text style={styles.textStrong}>{isFreeShippingEligible ? 'Gratis' : money((selectedShippingOption.precio || 0) / 100)}</Text>
+                    <Text style={styles.textStrong}>{isFreeShippingEligible ? 'Gratis' : money(selectedShippingOption.precio || 0)}</Text>
                   </View>
                 ) : (
                   <Text style={styles.infoBlue}>
@@ -1016,7 +922,7 @@ export default function CheckoutScreen() {
                   : selectedShippingOption
                   ? isFreeShippingEligible
                     ? 'Gratis'
-                    : money((selectedShippingOption.precio || 0) / 100)
+                    : money(selectedShippingOption.precio || 0)
                   : 'A definir'}
               </Text>
             </View>
@@ -1063,24 +969,6 @@ export default function CheckoutScreen() {
           </View>
         </ScrollView>
 
-        {/* Overlay de debug (visible si EXPO_PUBLIC_DEBUG_CHECKOUT=1) */}
-        <CheckoutDebug
-          step={dbgStep}
-          error={dbgError}
-          extra={{
-            USE_WEB: process.env.EXPO_PUBLIC_USE_WEB_API_CHECKOUT,
-            API_BASE: process.env.EXPO_PUBLIC_API_BASE,
-            items: items.length,
-            subtotal,
-            discount,
-            shippingCost,
-            shippingMethod,
-            paymentMethod,
-            selectedShippingOption: selectedShippingOption?.operativa ?? null,
-          }}
-          onClear={() => setDbgError(null)}
-        />
-
         <ProvincePicker
           visible={provPicker}
           onClose={() => setProvPicker(false)}
@@ -1108,7 +996,6 @@ export default function CheckoutScreen() {
                     onPress={() => {
                       setSelectedBranch(b);
                       setBranchModalVisible(false);
-                      setDbgStep('branches:selected');
                     }}
                     style={({ pressed }) => [styles.optionRow, pressed && { backgroundColor: C.primarySoft }]}
                   >

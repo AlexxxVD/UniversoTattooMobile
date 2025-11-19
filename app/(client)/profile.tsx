@@ -542,7 +542,6 @@ export default function ProfileScreen() {
               </Text>
             </View>
             {cliente ? (
-              // BOTÓN EDITAR REEMPLAZADO
               <Pressable style={styles.headerEditBtn} onPress={startEdit}>
                 <Text style={{ color: C.text, fontWeight: '600', fontSize: 13 }}>Editar</Text>
               </Pressable>
@@ -645,7 +644,8 @@ export default function ProfileScreen() {
                   <Button title="Ir a la tienda" onPress={() => router.push('../(client)/store')} />
                 </View>
               ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                // ===== CAMBIO CLAVE AQUÍ: Solo View con gap, sin row ni wrap =====
+                <View style={{ gap: 10 }}>
                   {favorites.map((f) => (
                     <FavoriteCard
                       key={f.producto_id}
@@ -1009,9 +1009,9 @@ const styles = StyleSheet.create({
   tabText: { color: C.muted, fontWeight: '600' },
   tabTextActive: { color: C.text, fontWeight: '800' },
 
-  // === CARD FAVORITOS AJUSTADA ===
+  // === CARD FAVORITOS AJUSTADA A FULL WIDTH ===
   favCard: {
-    width: '48%',
+    width: '100%', // <--- SEGURO: 100%
     backgroundColor: C.card,
     borderColor: C.border,
     borderWidth: 1,
