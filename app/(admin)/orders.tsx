@@ -70,11 +70,11 @@ export default function OrdersScreen() {
 
   const [filter, setFilter] = useState<FilterKey>('todos');
   const [q, setQ] = useState('');
-  
+   
   // Modal de detalles
   const [selectedOrder, setSelectedOrder] = useState<PedidoConCliente | null>(null);
   const [showDetails, setShowDetails] = useState(false);
-  
+   
   // Modal de creación manual
   const [showCreateModal, setShowCreateModal] = useState(false);
 
@@ -251,7 +251,7 @@ export default function OrdersScreen() {
           }
         />
       )}
-      
+       
       {/* Modal de detalles */}
       {selectedOrder && (
         <OrderDetailsModal
@@ -266,7 +266,7 @@ export default function OrdersScreen() {
           }}
         />
       )}
-      
+       
       {/* Modal de creación manual */}
       <CreateManualOrderModal
         visible={showCreateModal}
@@ -354,17 +354,17 @@ function CreateManualOrderModal({
 }) {
   const [loading, setLoading] = useState(false);
   const [loadingProductos, setLoadingProductos] = useState(false);
-  
+   
   // Productos y categorías
   const [productos, setProductos] = useState<Producto[]>([]);
   const [filteredProductos, setFilteredProductos] = useState<Producto[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
   const [selectedCategoria, setSelectedCategoria] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  
+   
   // Items del carrito
   const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
-  
+   
   // Datos del cliente
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteApellido, setClienteApellido] = useState('');
@@ -373,7 +373,7 @@ function CreateManualOrderModal({
   const [metodoPago, setMetodoPago] = useState('efectivo');
   const [estadoPedido, setEstadoPedido] = useState<EstadoPedido>('PENDIENTE');
   const [estadoPago, setEstadoPago] = useState<EstadoPago>('PENDIENTE');
-  
+   
   // Modal de selección de variantes
   const [selectingVariantFor, setSelectingVariantFor] = useState<Producto | null>(null);
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
@@ -436,17 +436,13 @@ function CreateManualOrderModal({
             (total: number, variante: any) => total + (variante.stock || 0),
             0
           ) || prod.stock_total || 0;
-          
+           
           return {
             ...prod,
             stock_total: stockCalculado,
           };
         });
         
-        console.log('📦 Productos cargados:', prodsConStock.length);
-        if (prodsConStock.length > 0) {
-          console.log('📊 Ejemplo producto:', JSON.stringify(prodsConStock[0], null, 2));
-        }
         setProductos(prodsConStock as any);
         setFilteredProductos(prodsConStock as any);
       }
@@ -533,7 +529,7 @@ function CreateManualOrderModal({
 
     const varianteLabel = variante ? getVarianteLabel(variante) : '';
     const varianteText = varianteLabel ? ` (${varianteLabel})` : '';
-    
+     
     Toast.show({
       type: 'success',
       text1: 'Producto agregado',
@@ -726,19 +722,6 @@ function CreateManualOrderModal({
 
       if (ppError) throw ppError;
 
-      // 4. Actualizar stock (comentado porque la función RPC no existe en mobile)
-      // for (const item of orderItems) {
-      //   if (item.variante_id) {
-      //     const { error: stockError } = await supabase.rpc('decrementar_stock_variante', {
-      //       p_variante_id: item.variante_id,
-      //       p_cantidad: item.cantidad,
-      //     });
-      //     if (stockError) console.error('Error actualizando stock variante:', stockError);
-      //   }
-      // }
-      
-      // TODO: Implementar actualización de stock manualmente si es necesario
-
       Toast.show({
         type: 'success',
         text1: '¡Pedido creado!',
@@ -872,7 +855,7 @@ function CreateManualOrderModal({
                       ))}
                     </View>
                   </View>
-                  
+                   
                   <View>
                     <Text style={styles.label}>Estado del Pedido</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
@@ -902,7 +885,7 @@ function CreateManualOrderModal({
                       ))}
                     </View>
                   </View>
-                  
+                   
                   <View>
                     <Text style={styles.label}>Estado del Pago</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
@@ -1131,7 +1114,7 @@ function CreateManualOrderModal({
                       {filteredProductos.map((producto) => {
                         const enCarrito = orderItems.find((item) => item.producto.id_producto === producto.id_producto);
                         const tieneVariantes = producto.ProductoVariante && producto.ProductoVariante.length > 0;
-                      
+                       
                       return (
                         <Pressable
                           key={producto.id_producto}
@@ -1236,7 +1219,7 @@ function CreateManualOrderModal({
                   <Ionicons name="close" size={24} color={C.text} />
                 </Pressable>
               </View>
-              
+               
               <Text style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
                 {selectingVariantFor.nombre}
               </Text>
@@ -1338,6 +1321,9 @@ function paymentBadge(estado?: string | null) {
   return { bg: 'rgba(156,163,175,0.15)', fg: '#E5E7EB', br: 'rgba(156,163,175,0.35)', label: e };
 }
 
+// ===========================
+// ORDER CARD MODIFICADO
+// ===========================
 function OrderCard({ item, onPress }: { item: PedidoConCliente; onPress: () => void }) {
   const statusStyle = statusBadge(item.estado);
   const paymentStyle = paymentBadge(item.estado_pago);
@@ -1360,23 +1346,21 @@ function OrderCard({ item, onPress }: { item: PedidoConCliente; onPress: () => v
 
   return (
     <Pressable style={styles.card} onPress={onPress}>
-      {/* Header: Número de pedido y estados */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {/* Header: Número de pedido y Fecha (La fecha sube aquí para ahorrar espacio) */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
           <Ionicons name="receipt-outline" size={16} color={C.primary} />
-          <Text style={styles.orderNumber}>#{item.numero_pedido}</Text>
+          {/* numberOfLines y flex: 1 aseguran que si es muy largo no rompa el diseño */}
+          <Text style={styles.orderNumber} numberOfLines={1} ellipsizeMode="middle">
+            #{item.numero_pedido}
+          </Text>
         </View>
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          <View style={[styles.badge, { backgroundColor: statusStyle.bg, borderColor: statusStyle.br }]}>
-            <Text style={[styles.badgeText, { color: statusStyle.fg }]} numberOfLines={1}>
-              {statusStyle.label}
-            </Text>
-          </View>
-        </View>
+        {/* Movemos la fecha aquí arriba para balancear */}
+        <Text style={[styles.metaText, { fontSize: 11 }]}>{formatDate(item.fecha_pedido)}</Text>
       </View>
 
       {/* Cliente */}
-      <View style={{ marginBottom: 8 }}>
+      <View style={{ marginBottom: 12 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
           <Ionicons name="person-outline" size={14} color={C.primary} />
           <Text style={styles.clientName}>
@@ -1388,49 +1372,53 @@ function OrderCard({ item, onPress }: { item: PedidoConCliente; onPress: () => v
         <Text style={styles.metaText} numberOfLines={1}>
           {item.cliente?.email || item.email_comprador || 'Sin email'}
         </Text>
-        {(item.cliente?.telefono || item.telefono_comprador) && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-            <Ionicons name="call-outline" size={12} color={C.muted} />
-            <Text style={styles.metaText}>{item.cliente?.telefono || item.telefono_comprador}</Text>
-          </View>
-        )}
       </View>
 
-      {/* Información del pedido */}
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="calendar-outline" size={14} color={C.muted} />
-          <Text style={styles.metaText}>{formatDate(item.fecha_pedido)}</Text>
-        </View>
-        
-        {item.metodo_pago && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Ionicons name="card-outline" size={14} color={C.muted} />
-            <Text style={styles.metaText} numberOfLines={1}>
-              {item.metodo_pago}
-            </Text>
-          </View>
-        )}
-        
-        {item.tracking_number && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            <Ionicons name="checkmark-circle" size={14} color={C.success} />
-            <Text style={[styles.metaText, { color: C.success }]}>Con tracking</Text>
-          </View>
-        )}
-      </View>
+      {/* Separador visual */}
+      <View style={{ height: 1, backgroundColor: C.border, marginBottom: 10 }} />
 
-      {/* Footer: Total y estado de pago */}
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 1, borderTopColor: C.border }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-          <Ionicons name="cash-outline" size={16} color={C.success} />
-          <Text style={styles.totalText}>{formatCurrency(item.total)}</Text>
+      {/* Footer: Total a la izquierda, Estados detallados a la derecha */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+        
+        {/* Izquierda: Total y Método de pago */}
+        <View style={{ gap: 4 }}>
+          {item.metodo_pago && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Ionicons name="card-outline" size={12} color={C.muted} />
+              <Text style={[styles.metaText, { fontSize: 11 }]} numberOfLines={1}>
+                {item.metodo_pago}
+              </Text>
+            </View>
+          )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            <Ionicons name="cash-outline" size={18} color={C.success} />
+            <Text style={styles.totalText}>{formatCurrency(item.total)}</Text>
+          </View>
         </View>
         
-        <View style={[styles.badge, { backgroundColor: paymentStyle.bg, borderColor: paymentStyle.br }]}>
-          <Text style={[styles.badgeText, { color: paymentStyle.fg }]} numberOfLines={1}>
-            {paymentStyle.label}
-          </Text>
+        {/* Derecha: Estados con etiquetas claras */}
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          
+          {/* Fila Estado PEDIDO */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 0.5 }}>PEDIDO</Text>
+            <View style={[styles.badge, { backgroundColor: statusStyle.bg, borderColor: statusStyle.br, minWidth: 85, alignItems: 'center' }]}>
+              <Text style={[styles.badgeText, { color: statusStyle.fg }]}>
+                {statusStyle.label}
+              </Text>
+            </View>
+          </View>
+
+          {/* Fila Estado PAGO */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={{ fontSize: 10, color: C.muted, fontWeight: '700', letterSpacing: 0.5 }}>PAGO</Text>
+            <View style={[styles.badge, { backgroundColor: paymentStyle.bg, borderColor: paymentStyle.br, minWidth: 85, alignItems: 'center' }]}>
+              <Text style={[styles.badgeText, { color: paymentStyle.fg }]}>
+                {paymentStyle.label}
+              </Text>
+            </View>
+          </View>
+
         </View>
       </View>
     </Pressable>
@@ -1570,7 +1558,7 @@ function OrderDetailsModal({
               <Ionicons name="cube" size={18} color={C.primary} />
               <Text style={styles.detailCardTitle}>Estado del Pedido</Text>
             </View>
-            
+             
             <View style={{ padding: 12, backgroundColor: C.card, borderRadius: 8, borderWidth: 1, borderColor: C.border }}>
               <Text style={[styles.detailText, { fontSize: 16, fontWeight: '600' }]}>
                 {statusBadge(order.estado).label}
@@ -1584,7 +1572,7 @@ function OrderDetailsModal({
               <Ionicons name="card" size={18} color={C.primary} />
               <Text style={styles.detailCardTitle}>Estado de Pago</Text>
             </View>
-            
+             
             <View style={{ padding: 12, backgroundColor: C.card, borderRadius: 8, borderWidth: 1, borderColor: C.border, marginBottom: 12 }}>
               <Text style={[styles.detailText, { fontSize: 16, fontWeight: '600' }]}>
                 {paymentBadge(order.estado_pago).label}
@@ -1605,7 +1593,7 @@ function OrderDetailsModal({
               <Ionicons name="car" size={18} color={C.primary} />
               <Text style={styles.detailCardTitle}>Información de Envío</Text>
             </View>
-            
+             
             <Text style={[styles.detailText, { marginBottom: 6 }]}>Número de Tracking</Text>
             <TextInput
               style={styles.input}
@@ -1614,7 +1602,7 @@ function OrderDetailsModal({
               value={editData.tracking_number}
               onChangeText={(text) => setEditData({ ...editData, tracking_number: text })}
             />
-            
+             
             {order.tipo_envio && (
               <Text style={[styles.detailText, { marginTop: 8 }]}>
                 <Text style={{ fontWeight: '700' }}>Tipo: </Text>
@@ -1635,7 +1623,7 @@ function OrderDetailsModal({
               <Ionicons name="cash" size={18} color={C.primary} />
               <Text style={styles.detailCardTitle}>Resumen de Costos</Text>
             </View>
-            
+             
             <View style={{ gap: 6 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                 <Text style={styles.detailText}>Subtotal:</Text>
@@ -1719,7 +1707,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
   },
-  orderNumber: { color: C.text, fontWeight: '800', fontSize: 15 },
+  orderNumber: { color: C.text, fontWeight: '800', fontSize: 15, flex: 1 },
   clientName: { color: C.text, fontWeight: '700', fontSize: 15 },
   metaText: { color: C.muted, fontSize: 13 },
   totalText: { color: C.success, fontWeight: '800', fontSize: 16 },
@@ -1734,7 +1722,7 @@ const styles = StyleSheet.create({
 
   // Modal
   modalTitle: { color: C.text, fontSize: 20, fontWeight: '800' },
-  
+   
   detailCard: {
     backgroundColor: C.card,
     borderColor: C.border,
@@ -1744,14 +1732,14 @@ const styles = StyleSheet.create({
   },
   detailCardTitle: { color: C.text, fontSize: 16, fontWeight: '700' },
   detailText: { color: C.text, fontSize: 14, marginBottom: 4 },
-  
+   
   label: {
     color: C.text,
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 4,
   },
-  
+   
   input: {
     backgroundColor: '#11151B',
     borderWidth: 1,

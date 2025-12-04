@@ -132,23 +132,26 @@ export default function PagoPendienteScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Pending Header */}
-        <View style={styles.pendingHeader}>
-          <View style={styles.pendingIconWrap}>
-            <Ionicons name="time" size={64} color={C.warning} />
+      {/* Header con gradiente */}
+      <View style={styles.headerGradient}>
+        <Pressable onPress={() => router.replace('/(client)')} style={styles.closeBtn}>
+          <Ionicons name="close" size={24} color="#fff" />
+        </Pressable>
+        <View style={styles.headerContent}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="time-outline" size={48} color="#FFF" />
           </View>
-          <Text style={styles.pendingTitle}>Pago pendiente</Text>
-          <Text style={styles.pendingSubtitle}>
-            Tu pedido #{orderNumber} está esperando confirmación de pago
-          </Text>
+          <Text style={styles.headerTitle}>Pago Pendiente</Text>
+          <Text style={styles.headerSubtitle}>Pedido #{orderNumber}</Text>
         </View>
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Status Badge */}
         <View style={styles.badgeContainer}>
-          <View style={[styles.badge, { backgroundColor: C.warningSoft }]}>
+          <View style={[styles.badge, { backgroundColor: C.warningSoft, borderColor: C.warning }]}>
             <Ionicons name="hourglass-outline" size={16} color={C.warning} />
-            <Text style={[styles.badgeText, { color: C.warning }]}>Pendiente de confirmación</Text>
+            <Text style={[styles.badgeText, { color: C.warning }]}>Esperando confirmación</Text>
           </View>
         </View>
 
@@ -176,6 +179,7 @@ export default function PagoPendienteScreen() {
             </View>
           </View>
           <View style={styles.infoBox}>
+            <Ionicons name="mail-outline" size={16} color={C.warning} style={{ marginRight: 8 }} />
             <Text style={styles.infoText}>
               Te avisaremos por email cuando tu pago sea confirmado
             </Text>
@@ -380,6 +384,56 @@ const styles = StyleSheet.create({
     color: C.muted,
     textAlign: 'center',
   },
+  headerGradient: {
+    backgroundColor: C.warning,
+    paddingTop: 16,
+    paddingBottom: 32,
+    position: 'relative',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  headerContent: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    fontWeight: '600',
+  },
+  scrollContent: {
+    padding: 16,
+    paddingTop: 0,
+    marginTop: -16,
+    paddingBottom: 32,
+  },
   pendingHeader: {
     alignItems: 'center',
     paddingVertical: 24,
@@ -459,6 +513,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   infoText: {
     color: C.text,

@@ -139,14 +139,13 @@ export default function ClientHome() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    // Aquí podrías recargar otros datos si es necesario en el futuro
+    
     setRefreshing(false);
   };
 
   const openURL = (url: string) => Linking.openURL(url).catch(() => {});
   const openInstagram = () => openURL('https://www.instagram.com/universotattoo_insumos/');
-  // Reemplazá por tu número real en formato 549XXXXXXXXXX
-  const openWhatsApp = () => openURL('https://wa.me/549xxxxxxxxxx?text=Hola%20Universo%20Tattoo%20%F0%9F%91%8B');
+  const openWhatsApp = () => openURL('https://api.whatsapp.com/send?phone=543442550581&text=Hola%20Universo%20Tattoo%20quiero%20más%20información!%20');
 
   const videoHeight = useMemo(() => {
     const pad = 24;
@@ -503,9 +502,9 @@ const styles = StyleSheet.create({
 
   socialBtn: { alignItems: 'center', gap: 6 },
   socialIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(124,58,237,0.12)',
     alignItems: 'center',
     justifyContent: 'center',

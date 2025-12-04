@@ -1,5 +1,6 @@
-import { supabase } from '@/lib/supabase';
+import { sendVerificationEmail } from '@/lib/email-service';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Toast from 'react-native-toast-message';
 
@@ -16,16 +17,22 @@ export default function VerifyPendingScreen() {
     }
     try {
       setLoading(true);
-      const redirectTo = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL || undefined;
-      const { error } = await supabase.auth.resend({
-        type: 'signup',
-        email,
-        options: { emailRedirectTo: redirectTo },
-      });
-      if (error) {
-        Toast.show({ type: 'error', text1: 'No se pudo reenviar', text2: error.message });
+      
+      const result = await sendVerificationEmail(email);
+
+      if (!result.success) {
+        if (result.remainingMinutes) {
+          Toast.show({ 
+            type: 'error', 
+            text1: 'Esperá un momento', 
+            text2: `Podés reenviar en ${result.remainingMinutes} minuto${result.remainingMinutes > 1 ? 's' : ''}` 
+          });
+        } else {
+          Toast.show({ type: 'error', text1: 'No se pudo reenviar', text2: result.error });
+        }
         return;
       }
+      
       Toast.show({ type: 'success', text1: 'Email reenviado', text2: 'Revisá bandeja de entrada y spam' });
     } finally {
       setLoading(false);
@@ -48,8 +55,6 @@ export default function VerifyPendingScreen() {
     </View>
   );
 }
-
-import { useState } from 'react';
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16, justifyContent: 'center', backgroundColor: '#0b0b0b' },

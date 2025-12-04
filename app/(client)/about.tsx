@@ -283,11 +283,13 @@ export default function AboutScreen() {
           <View style={{ gap: 12 }}>
             {teamMembers.map((member) => (
               <Card key={member.name} style={{ padding: 0, overflow: 'hidden' }}>
-                <Image
-                  source={img(member.image)}
-                  style={{ width: '100%', height: 300 }}
-                  resizeMode="cover"
-                />
+                <View style={{ width: '100%', height: 400, backgroundColor: '#1A1F2E' }}>
+                  <Image
+                    source={img(member.image)}
+                    style={{ width: '100%', height: '100%' }}
+                    resizeMode="contain"
+                  />
+                </View>
                 <View style={{ padding: 16, gap: 8 }}>
                   <Text style={styles.teamName}>{member.name}</Text>
                   <Text style={[styles.teamRole, { color: member.textColor }]}>{member.role}</Text>

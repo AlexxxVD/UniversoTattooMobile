@@ -732,18 +732,18 @@ export default function ProfileScreen() {
                   <Section title="Dirección de envío" />
                 </View>
                 <Row>
-                  <LabeledInput label="Calle" placeholder="Thames" value={edit.calle} onChangeText={(t) => setEdit((s) => ({ ...s, calle: t }))} />
-                  <LabeledInput label="Número" placeholder="2439" value={edit.numero} onChangeText={(t) => setEdit((s) => ({ ...s, numero: t }))} />
+                  <LabeledInput label="Calle" placeholder="" value={edit.calle} onChangeText={(t) => setEdit((s) => ({ ...s, calle: t }))} />
+                  <LabeledInput label="Número" placeholder="" value={edit.numero} onChangeText={(t) => setEdit((s) => ({ ...s, numero: t }))} />
                 </Row>
                 <Row>
-                  <LabeledInput label="Departamento (opcional)" placeholder="4B" value={edit.departamento} onChangeText={(t) => setEdit((s) => ({ ...s, departamento: t }))} />
-                  <LabeledInput label="Barrio (opcional)" placeholder="Palermo" value={edit.barrio} onChangeText={(t) => setEdit((s) => ({ ...s, barrio: t }))} />
+                  <LabeledInput label="Departamento (opcional)" placeholder="" value={edit.departamento} onChangeText={(t) => setEdit((s) => ({ ...s, departamento: t }))} />
+                  <LabeledInput label="Barrio (opcional)" placeholder="" value={edit.barrio} onChangeText={(t) => setEdit((s) => ({ ...s, barrio: t }))} />
                 </Row>
                 <Row>
-                  <LabeledInput label="Ciudad" placeholder="Buenos Aires" value={edit.ciudad} onChangeText={(t) => setEdit((s) => ({ ...s, ciudad: t }))} />
-                  <LabeledInput label="Provincia" placeholder="CABA" value={edit.provincia} onChangeText={(t) => setEdit((s) => ({ ...s, provincia: t }))} />
+                  <LabeledInput label="Ciudad" placeholder="" value={edit.ciudad} onChangeText={(t) => setEdit((s) => ({ ...s, ciudad: t }))} />
+                  <LabeledInput label="Provincia" placeholder="" value={edit.provincia} onChangeText={(t) => setEdit((s) => ({ ...s, provincia: t }))} />
                 </Row>
-                <LabeledInput label="Código postal" placeholder="1234" value={edit.codigo_postal} onChangeText={(t) => setEdit((s) => ({ ...s, codigo_postal: t }))} />
+                <LabeledInput label="Código postal" placeholder="" value={edit.codigo_postal} onChangeText={(t) => setEdit((s) => ({ ...s, codigo_postal: t }))} />
               </View>
             </ScrollView>
 

@@ -3,20 +3,20 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Image,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -24,7 +24,6 @@ import { Tables } from '../../lib/database.types';
 import { supabase } from '../../lib/supabase';
 
 type Producto = Tables<'Producto'>;
-type ProductoVariante = Tables<'ProductoVariante'>;
 type Categoria = Tables<'Categoria'>;
 
 const C = {
@@ -43,7 +42,8 @@ const C = {
 
 const PAGE_SIZE = 30;
 
-type FilterKey = 'todos' | 'destacados' | 'activos' | 'agotados' | 'descontinuados';
+// MODIFICADO: Se eliminó 'descontinuados'
+type FilterKey = 'todos' | 'destacados' | 'activos' | 'agotados';
 
 // Meta calculada por producto a partir de variantes
 type VariantMeta = {
@@ -576,8 +576,6 @@ export default function ProductsScreen() {
           return esActivo === true || estado === 'ACTIVO' || stockReal > 0;
         case 'agotados':
           return stockReal <= 0;
-        case 'descontinuados':
-          return esActivo === false || estado === 'DESCONTINUADO';
         case 'todos':
         default:
           return true;
@@ -1040,12 +1038,12 @@ function TabsBar({
   value: FilterKey;
   onChange: (v: FilterKey) => void;
 }) {
+  // MODIFICADO: Se eliminó 'Desc.'
   const tabs: { key: FilterKey; label: string }[] = [
     { key: 'todos', label: 'Todos' },
     { key: 'destacados', label: 'Destacados' },
     { key: 'activos', label: 'Activos' },
     { key: 'agotados', label: 'Agotados' },
-    { key: 'descontinuados', label: 'Desc.' },
   ];
 
   return (
@@ -1062,7 +1060,10 @@ function TabsBar({
               pressed && { opacity: 0.95 },
             ]}
           >
-            <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+            {/* MODIFICADO: fontSize: 11 para asegurar que entre bien */}
+            <Text style={[styles.tabText, active && styles.tabTextActive]} numberOfLines={1}>
+              {t.label}
+            </Text>
           </Pressable>
         );
       })}
@@ -1226,7 +1227,7 @@ const styles = StyleSheet.create({
   },
   tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', justifyContent: 'center' },
   tabActive: { backgroundColor: C.primarySoft },
-  tabText: { color: C.muted, fontWeight: '600' },
+  tabText: { color: C.muted, fontWeight: '600', fontSize: 11 }, // MODIFICADO: fontSize 11
   tabTextActive: { color: C.text, fontWeight: '800' },
 
   // Types

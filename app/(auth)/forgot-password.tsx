@@ -1,22 +1,21 @@
+import { requestPasswordReset } from '@/lib/email-service';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
-
-// NOTA: Quité la importación de 'supabase' porque ya no se usa en esta pantalla.
 
 const C = {
   bg: '#0E1116',
@@ -49,7 +48,6 @@ export default function ForgotPasswordScreen() {
 
   const validateEmail = (v: string) => /^\S+@\S+\.\S+$/.test(v.trim().toLowerCase());
 
-
   async function handleReset() {
     const value = email.trim().toLowerCase();
     if (!validateEmail(value)) {
@@ -57,49 +55,28 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
-    
-    const urlDeTuApi = 'https://universotattoo.com.ar/api/forgot-password';
-
     try {
       setLoading(true);
 
-      // Esta es la lógica CORRECTA: llamar a tu propia API
-      const response = await fetch(urlDeTuApi, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // Enviamos el email y la "señal" para el deep link
-        body: JSON.stringify({
-          email: value,
-          client: 'mobile', // <--- La "señal" para tu API
-        }),
-      });
+      const result = await requestPasswordReset(value);
 
-      const data = await response.json();
-
-      // Si la API da un error (ej: 400, 429, 500)
-      if (!response.ok) {
+      if (!result.success) {
         Toast.show({
           type: 'error',
           text1: 'No se pudo enviar el correo',
-          text2: data.error || 'Ocurrió un error al solicitar el reseteo',
+          text2: result.error || 'Ocurrió un error al solicitar el reseteo',
         });
         return;
       }
 
-      // ¡Éxito! Tu API de Resend (la de la web) funcionó
       Toast.show({
         type: 'success',
         text1: 'Revisá tu correo',
         text2: 'Te enviamos un enlace para restablecer la contraseña',
       });
 
-      // Volver a la pantalla de login (esto ya lo tenías)
       router.replace('/(auth)');
-
     } catch (e: any) {
-      // Error de red (ej: sin internet)
       Toast.show({
         type: 'error',
         text1: 'Error de red',

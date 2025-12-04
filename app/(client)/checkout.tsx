@@ -3,21 +3,22 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    useWindowDimensions,
-    View,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { apiPost } from '../../lib/api';
 import { useCartStore } from '../../lib/cart-store';
+import { sendOrderConfirmation } from '../../lib/email-service';
 import { ocaCotizar, ocaSucursales } from '../../lib/oca';
 import { supabase } from '../../lib/supabase';
 
@@ -537,11 +538,6 @@ export default function CheckoutScreen() {
       Alert.alert('Términos', 'Debés aceptar los términos y condiciones.');
       return;
     }
-    if (orderSummary.items.some((i) => i.quantity > i.stock && i.stock < 999)) {
-      console.warn('[checkout] validate stock fail');
-      Alert.alert('Stock insuficiente', 'Hay productos sin stock suficiente.');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -549,11 +545,34 @@ export default function CheckoutScreen() {
       if (USE_WEB_API_CHECKOUT) {
         setIsProcessing(true);
 
+        // Log para debugging del error de stock con variantes
+        console.log('═══════════════════════════════════════════════════');
+        console.log('🛒 ITEMS DEL CARRITO ORIGINAL:');
+        items.forEach((item, idx) => {
+          console.log(`Item ${idx + 1}:`, {
+            id: item.id,
+            nombre: item.nombre,
+            quantity: item.quantity,
+            cantidad: item.cantidad,
+            stock: item.stock,
+          });
+        });
+        
+        console.log('\n📦 ITEMS NORMALIZADOS PARA ENVIAR:');
+        orderSummary.items.forEach((item, idx) => {
+          console.log(`Item ${idx + 1}:`, {
+            id: item.id,
+            quantity: item.quantity,
+            price: item.price,
+          });
+        });
+        console.log('═══════════════════════════════════════════════════\n');
+
         // 1. Preparar payload para crear orden
         const orderPayload = {
           items: orderSummary.items.map((it) => ({
             id: String(it.id),
-            variantId: it.variantId ?? null,
+            varianteId: it.variantId ?? null, // Backend espera varianteId en español
             quantity: it.quantity,
             price: it.price,
           })),
@@ -635,35 +654,23 @@ export default function CheckoutScreen() {
           throw new Error(`No se recibió el número de pedido. Respuesta: ${JSON.stringify(orderRes)}`);
         }
 
+        // Enviar email de confirmación (no bloquea el flujo si falla)
+        sendOrderConfirmation(orderNumber).catch((err) => {
+          console.warn('[checkout] Email de confirmación no enviado:', err);
+        });
+
         // 3. Si es Mercado Pago, crear preferencia y redirigir
         if (paymentMethod === 'mercadopago') {
 
           const preferencePayload = {
-            order_number: orderNumber,
             items: [
-              ...orderSummary.items.map((it) => {
-                const unitPrice = Number(it.price);
-                const quantity = Number(it.quantity);
-                
-                // MercadoPago requiere unit_price con máximo 2 decimales y > 0
-                const validUnitPrice = Number.isFinite(unitPrice) && unitPrice > 0 
-                  ? Math.round(unitPrice * 100) / 100 
-                  : 1;
-
-                return {
-                  id: it.id || `item_${Math.random()}`,
-                  name: it.name || 'Producto',
-                  quantity: quantity > 0 ? quantity : 1,
-                  price: validUnitPrice,
-                };
-              }),
-              // Agregar envío como item si corresponde
-              ...(orderSummary.shipping > 0 ? [{
-                id: 'shipping',
-                name: 'Envío',
+              {
+                id: 'order',
+                name: `Pedido #${orderNumber} - Universo Tattoo`,
+                description: `${orderSummary.items.length} producto${orderSummary.items.length > 1 ? 's' : ''}`,
                 quantity: 1,
-                price: Math.round(orderSummary.shipping * 100) / 100,
-              }] : []),
+                price: Math.round(orderSummary.total),
+              }
             ],
             payer: {
               firstName: formData.firstName,
@@ -671,7 +678,7 @@ export default function CheckoutScreen() {
               email: formData.email,
               phone: formData.phone,
             },
-            total: orderSummary.total,
+            external_reference: orderNumber,
           };
 
           const prefRes = await apiPost<{ init_point?: string; sandbox_init_point?: string }>(
