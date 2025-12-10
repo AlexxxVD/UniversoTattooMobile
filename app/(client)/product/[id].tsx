@@ -342,7 +342,6 @@ export default function ProductDetailScreen() {
     } as any);
 
     Toast.show({ type: 'success', text1: 'Agregado al carrito' });
-    router.push('/(client)/cart');
   }, [product, currentVariant, currentPrice, currentStock, mainImage, router, variants.length, selectedVariantId, quantity]);
 
   const nextImage = () => setSelectedImageIndex((i) => Math.min(i + 1, Math.max(0, images.length - 1)));

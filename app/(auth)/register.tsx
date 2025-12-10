@@ -1,23 +1,24 @@
 import { getPasswordStrength } from '@/lib/passwordStrength';
 import { supabase } from '@/lib/supabase';
-import { ensureUserRow } from '@/lib/userProfile';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    Keyboard,
-    KeyboardAvoidingView,
-    Platform,
-    Pressable,
-    SafeAreaView,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View
+  ActivityIndicator,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 import Toast from 'react-native-toast-message';
+
+const WEB_API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://www.universotattoo.com.ar';
 
 const C = {
   bg: '#0E1116',
@@ -124,13 +125,6 @@ export default function RegisterScreen() {
 
   const goPrev = () => setStep(1);
 
-  function mapSignUpError(message?: string) {
-    const msg = (message || '').toLowerCase();
-    if (msg.includes('user already registered')) return 'El correo ya está registrado';
-    if (msg.includes('rate limit')) return 'Demasiados intentos, probá más tarde';
-    return message || 'No se pudo crear la cuenta';
-  }
-
   const handleRegister = async () => {
     const err2 = validateStep2();
     if (err2) {
@@ -141,40 +135,55 @@ export default function RegisterScreen() {
     setSubmitting(true);
     try {
       const email = values.email.trim().toLowerCase();
-      const emailRedirectTo = process.env.EXPO_PUBLIC_AUTH_REDIRECT_URL || undefined;
 
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password: values.password,
-        options: {
-          emailRedirectTo,
-          data: {
-            firstName: values.name.trim(),
-            lastName: values.lastName.trim(),
-            phone: values.phone.trim() || null,
-            address: values.address.trim() || null,
-            role: 'user',
-            acceptedTermsAt: new Date().toISOString(),
-          },
+      // Usar la API web para el registro (evita problemas con triggers de Supabase)
+      const response = await fetch(`${WEB_API_BASE}/api/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({
+          name: values.name.trim(),
+          lastName: values.lastName.trim(),
+          email,
+          password: values.password,
+          phone: values.phone.trim() || undefined,
+          address: values.address.trim() || undefined,
+          acceptTerms: values.acceptTerms,
+        }),
       });
 
-      if (error) {
-        Toast.show({ type: 'error', text1: 'No se pudo crear la cuenta', text2: mapSignUpError(error.message) });
+      const data = await response.json();
+
+      if (!response.ok) {
+        // Manejar errores específicos
+        if (data.code === 'EMAIL_ALREADY_EXISTS') {
+          Toast.show({ 
+            type: 'error', 
+            text1: 'Email ya registrado', 
+            text2: 'Podés recuperar tu contraseña si la olvidaste' 
+          });
+          return;
+        }
+        Toast.show({ 
+          type: 'error', 
+          text1: 'No se pudo crear la cuenta', 
+          text2: data.error || 'Error desconocido' 
+        });
         return;
       }
 
-      if (!data.session) {
-        Toast.show({ type: 'success', text1: 'Cuenta creada', text2: 'Te enviamos un email para verificar tu cuenta' });
-        router.replace({ pathname: '/(auth)/verify-pending', params: { email } } as any);
-        return;
-      }
+      // Registro exitoso - redirigir a verificar email
+      Toast.show({ 
+        type: 'success', 
+        text1: 'Cuenta creada', 
+        text2: 'Te enviamos un email para verificar tu cuenta' 
+      });
+      router.replace({ pathname: '/(auth)/verify-pending', params: { email } } as any);
 
-      await ensureUserRow({ defaultRole: 'user' });
-      Toast.show({ type: 'success', text1: '¡Bienvenido!', text2: 'Cuenta creada correctamente' });
-      router.replace('/');
     } catch (e: any) {
-      Toast.show({ type: 'error', text1: 'Error inesperado', text2: e?.message ?? 'Intentá nuevamente' });
+      console.error('[Register] Error:', e);
+      Toast.show({ type: 'error', text1: 'Error de conexión', text2: 'Verificá tu internet e intentá nuevamente' });
     } finally {
       setSubmitting(false);
     }

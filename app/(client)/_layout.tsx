@@ -41,17 +41,17 @@ function CartHeaderButton() {
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel="Ir al carrito"
-      style={{ paddingRight: 8, marginRight: 4 }}
+      style={{ paddingRight: 16, marginRight: 8 }}
     >
-      <View style={{ position: 'relative' }}>
+      <View style={{ position: 'relative', overflow: 'visible', padding: 4 }}>
         {/* Icono blanco para el header oscuro */}
         <Ionicons name="cart-outline" size={22} color="#FFFFFF" />
         {count > 0 && (
           <View
             style={{
               position: 'absolute',
-              top: -8,
-              right: -10,
+              top: -4,
+              right: -8,
               minWidth: 18,
               height: 18,
               borderRadius: 9,

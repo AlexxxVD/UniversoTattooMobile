@@ -689,10 +689,10 @@ export default function CheckoutScreen() {
           if (prefRes?.init_point || prefRes?.sandbox_init_point) {
             const redirectUrl = prefRes.init_point || prefRes.sandbox_init_point;
             
-            // Abrir MercadoPago y esperar el resultado
+            
             const result = await WebBrowser.openBrowserAsync(redirectUrl!);
             
-            // Si el usuario cancela o cierra, no limpiar el carrito
+            
             if (result.type === 'cancel' || result.type === 'dismiss') {
               Alert.alert(
                 'Pago cancelado',
@@ -702,10 +702,10 @@ export default function CheckoutScreen() {
               return;
             }
             
-            // Solo limpiar el carrito si completó el proceso
+            
             clearCart();
             
-            // Redirigir a pantalla de confirmación (pendiente hasta que MercadoPago confirme)
+            
             router.replace({
               pathname: '/(client)/pago/pendiente' as any,
               params: { order_number: orderNumber },

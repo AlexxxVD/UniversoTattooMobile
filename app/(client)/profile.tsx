@@ -2,17 +2,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Image,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Image,
+    Modal,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -76,6 +76,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<TabKey>('overview');
   const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null); // Email del usuario autenticado
   const [cliente, setCliente] = useState<Cliente | null>(null);
 
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
@@ -190,6 +191,7 @@ export default function ProfileScreen() {
     try {
       const { data } = await supabase.auth.getSession();
       const uid = data.session?.user?.id ?? null;
+      const sessionEmail = data.session?.user?.email ?? null;
       
       if (!uid) {
         Toast.show({ type: 'error', text1: 'Iniciá sesión' });
@@ -197,6 +199,7 @@ export default function ProfileScreen() {
         return;
       }
       setUserId(uid);
+      setUserEmail(sessionEmail); // Guardar email del usuario autenticado
 
       const { data: clienteRow, error: clienteErr } = await supabase
         .from('Cliente')
@@ -296,25 +299,75 @@ export default function ProfileScreen() {
     }
   }, [userId]);
 
-  // Pedidos
+  // Pedidos - buscar por clienteId O por email_comprador (usando email de sesión y de cliente)
   const loadOrders = useCallback(async () => {
-    if (!cliente?.id_cliente) {
+    const emailsToSearch = new Set<string>();
+    if (cliente?.email) emailsToSearch.add(cliente.email.toLowerCase());
+    if (userEmail) emailsToSearch.add(userEmail.toLowerCase());
+    
+    if (!cliente?.id_cliente && emailsToSearch.size === 0) {
       setOrders([]);
       setLoadingOrders(false);
       return;
     }
     setLoadingOrders(true);
     try {
-      const { data, error } = await supabase
-        .from('Pedido')
-        .select('id_pedido,numero_pedido,fecha_pedido,estado,metodo_pago,metodo_envio,envio,tracking_number')
-        .eq('clienteId', cliente.id_cliente)
-        .order('fecha_pedido', { ascending: false })
-        .limit(50);
+      // Combinar resultados de todas las queries
+      const allOrders: OrderWithTotals[] = [];
+      const seenIds = new Set<number>();
 
-      if (error) throw error;
+      // Query por clienteId
+      if (cliente?.id_cliente) {
+        const { data, error } = await supabase
+          .from('Pedido')
+          .select('id_pedido,numero_pedido,fecha_pedido,estado,metodo_pago,metodo_envio,envio,tracking_number,email_comprador,clienteId')
+          .eq('clienteId', cliente.id_cliente)
+          .order('fecha_pedido', { ascending: false })
+          .limit(50);
 
-      const rows = (data ?? []) as OrderWithTotals[];
+        if (error) {
+          console.warn('[profile] loadOrders by clienteId error:', error.message);
+        } else {
+          console.log('[profile] Orders found by clienteId:', data?.length ?? 0);
+          for (const order of (data ?? [])) {
+            if (!seenIds.has(order.id_pedido)) {
+              seenIds.add(order.id_pedido);
+              allOrders.push(order as OrderWithTotals);
+            }
+          }
+        }
+      }
+
+      // Query por cada email (case insensitive)
+      for (const email of emailsToSearch) {
+        const { data, error } = await supabase
+          .from('Pedido')
+          .select('id_pedido,numero_pedido,fecha_pedido,estado,metodo_pago,metodo_envio,envio,tracking_number,email_comprador,clienteId')
+          .ilike('email_comprador', email)
+          .order('fecha_pedido', { ascending: false })
+          .limit(50);
+
+        if (error) {
+          console.warn('[profile] loadOrders by email error:', email, error.message);
+        } else {
+          console.log('[profile] Orders found by email', email, ':', data?.length ?? 0);
+          for (const order of (data ?? [])) {
+            if (!seenIds.has(order.id_pedido)) {
+              seenIds.add(order.id_pedido);
+              allOrders.push(order as OrderWithTotals);
+            }
+          }
+        }
+      }
+
+      // Ordenar por fecha descendente
+      allOrders.sort((a, b) => {
+        const dateA = new Date(a.fecha_pedido as any).getTime();
+        const dateB = new Date(b.fecha_pedido as any).getTime();
+        return dateB - dateA;
+      });
+
+      const rows = allOrders;
 
       if (rows.length) {
         const ids = rows.map((r) => r.id_pedido);
@@ -348,7 +401,7 @@ export default function ProfileScreen() {
     } finally {
       setLoadingOrders(false);
     }
-  }, [cliente?.id_cliente]);
+  }, [cliente?.id_cliente, cliente?.email, userEmail]);
 
   useEffect(() => {
     loadProfile();
@@ -361,10 +414,10 @@ export default function ProfileScreen() {
   }, [userId, loadFavorites]);
 
   useEffect(() => {
-    if (cliente?.id_cliente) {
+    if (cliente?.id_cliente || cliente?.email || userEmail) {
       loadOrders();
     }
-  }, [cliente?.id_cliente, loadOrders]);
+  }, [cliente?.id_cliente, cliente?.email, userEmail, loadOrders]);
 
   const isPickup = (o: any) => {
     const m = (o?.metodo_envio || o?.tipo_envio || '').toString().toUpperCase();
@@ -590,13 +643,48 @@ export default function ProfileScreen() {
               </View>
             </Card>
 
+            {/* Información adicional - estilo web */}
             <Card>
-              <View style={{ padding: 14, gap: 10 }}>
-                <Text style={{ color: C.text, fontWeight: '800' }}>Información</Text>
-                <InfoRow icon="mail-outline" label="Email" value={cliente?.email ?? '(desde sesión)'} />
-                <InfoRow icon="call-outline" label="Teléfono" value={cliente?.telefono ?? 'No especificado'} />
-                <InfoRow icon="id-card-outline" label="DNI" value={cliente?.dni ?? 'No especificado'} />
-                <InfoRow icon="home-outline" label="Dirección" value={formatDireccion(cliente)} />
+              <View style={{ padding: 14, gap: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="settings-outline" size={18} color={C.primary} />
+                  <Text style={{ color: C.text, fontWeight: '800', fontSize: 16 }}>Información adicional</Text>
+                </View>
+                
+                <View style={{ gap: 10, marginTop: 4 }}>
+                  <InfoRowWeb label="DNI:" value={cliente?.dni} />
+                  <InfoRowWeb label="Dirección:" value={cliente?.calle ? `${cliente.calle}${cliente.numero ? ` ${cliente.numero}` : ''}` : null} />
+                  <InfoRowWeb label="Ciudad:" value={cliente?.ciudad} />
+                  <InfoRowWeb label="Provincia:" value={cliente?.provincia} />
+                  <InfoRowWeb label="Código Postal:" value={cliente?.codigo_postal} />
+                </View>
+
+                {/* Barra de progreso del perfil */}
+                <View style={{ marginTop: 12, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Text style={{ color: C.text, fontWeight: '600', fontSize: 14 }}>Perfil completado:</Text>
+                    <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>{calcProfileCompletion(cliente)}%</Text>
+                  </View>
+                  <View style={{ height: 6, backgroundColor: C.border, borderRadius: 999, overflow: 'hidden' }}>
+                    <View style={{ 
+                      height: '100%', 
+                      width: `${calcProfileCompletion(cliente)}%`, 
+                      borderRadius: 999,
+                      backgroundColor: 'transparent',
+                    }}>
+                      <View style={styles.progressGradient} />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Botón editar perfil */}
+                <Pressable 
+                  style={styles.editProfileBtn} 
+                  onPress={startEdit}
+                >
+                  <Ionicons name="create-outline" size={18} color={C.primary} />
+                  <Text style={{ color: C.primary, fontWeight: '600', fontSize: 14 }}>Editar perfil</Text>
+                </Pressable>
               </View>
             </Card>
           </>
@@ -606,7 +694,8 @@ export default function ProfileScreen() {
         {tab === 'orders' && (
           <Card>
             <View style={{ padding: 14 }}>
-              <Text style={{ color: C.text, fontWeight: '800', marginBottom: 10 }}>Mis pedidos</Text>
+              <Text style={{ color: C.text, fontWeight: '800', fontSize: 18, marginBottom: 2 }}>Mis pedidos</Text>
+              <Text style={{ color: C.muted, fontSize: 13, marginBottom: 14 }}>Historial completo de tus pedidos.</Text>
               {loadingOrders ? (
                 <View style={styles.center}>
                   <ActivityIndicator color={C.primary} />
@@ -888,6 +977,50 @@ function formatDireccion(c: Cliente | null): string {
   return parts.length ? parts.join(', ') : 'No especificada';
 }
 
+// Componente para mostrar fila de información estilo web
+function InfoRowWeb({ label, value }: { label: string; value: string | null | undefined }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+      <Text style={{ color: C.muted, fontSize: 14 }}>{label}</Text>
+      <Text 
+        style={{ 
+          color: value ? C.text : C.muted, 
+          fontWeight: value ? '600' : '400',
+          fontStyle: value ? 'normal' : 'italic',
+          fontSize: 14,
+          textAlign: 'right',
+          flex: 1,
+          marginLeft: 16,
+        }}
+      >
+        {value || 'No especificado'}
+      </Text>
+    </View>
+  );
+}
+
+// Calcular el porcentaje de perfil completado
+function calcProfileCompletion(c: Cliente | null): number {
+  if (!c) return 0;
+  
+  const fields = [
+    c.nombre,
+    c.apellido,
+    c.email,
+    c.telefono,
+    c.dni,
+    c.calle,
+    c.numero,
+    c.ciudad,
+    c.provincia,
+    c.codigo_postal,
+    c.fecha_nacimiento,
+  ];
+  
+  const filled = fields.filter(f => f != null && String(f).trim() !== '').length;
+  return Math.round((filled / fields.length) * 100);
+}
+
 // === COMPONENTE CARD EDITADO ===
 function FavoriteCard({
   fav,
@@ -959,24 +1092,69 @@ function OrderRow({ item, onView, onReorder }: { item: OrderWithTotals; onView: 
   const total =
     Number(item._total ?? 0) + ((item as any).metodo_envio?.toString().toUpperCase?.() === 'PICKUP' ? 0 : Number((item as any).envio ?? 0));
 
+  // Formatear fecha como en web (ej: "4 de diciembre de 2025")
+  const formatDateWeb = (dateStr: string | null) => {
+    if (!dateStr) return '—';
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleDateString('es-AR', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      });
+    } catch {
+      return '—';
+    }
+  };
+
+  // Contar productos
+  const productCount = item._items?.length ?? 0;
+
   return (
     <View style={styles.orderCard}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: C.text, fontWeight: '800' }}>#{item.numero_pedido ?? item.id_pedido}</Text>
-        <View style={[styles.badge, { backgroundColor: badge.bg, borderColor: badge.br }]}>
-          <Text style={{ color: badge.fg, fontWeight: '800', fontSize: 12 }}>{s}</Text>
+      {/* Header con número de pedido y precio + badge */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={{ color: C.text, fontWeight: '700', fontSize: 14 }}>
+            Pedido #ORD-{item.numero_pedido ?? item.id_pedido}
+          </Text>
+          <Text style={{ color: C.muted, fontSize: 13 }}>
+            {formatDateWeb(item.fecha_pedido as any)}
+          </Text>
+        </View>
+        <View style={{ alignItems: 'flex-end', gap: 6 }}>
+          <Text style={{ color: C.primary, fontWeight: '800', fontSize: 16 }}>
+            {total.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}
+          </Text>
+          <View style={[styles.badge, { backgroundColor: badge.bg, borderColor: badge.br }]}>
+            <Text style={{ color: badge.fg, fontWeight: '700', fontSize: 11, textTransform: 'uppercase' }}>{s}</Text>
+          </View>
         </View>
       </View>
-      <Text style={{ color: C.muted, marginTop: 2 }}>
-        {item.fecha_pedido ? new Date(item.fecha_pedido as any).toLocaleDateString() : '—'}
-      </Text>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8, alignItems: 'center' }}>
-        <Text style={{ color: C.text, fontWeight: '800' }}>
-          {total.toLocaleString('es-AR', { style: 'currency', currency: 'ARS' })}
-        </Text>
+
+      {/* Cantidad de productos y botones */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, alignItems: 'center' }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="cube-outline" size={16} color={C.muted} />
+          <Text style={{ color: C.muted, fontSize: 13 }}>
+            {productCount === 0 ? '—' : productCount === 1 ? '1 producto' : `${productCount} productos`}
+          </Text>
+        </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Button title="Ver" variant="outline" onPress={onView} />
-          <Button title="Reordenar" onPress={onReorder} />
+          <Pressable 
+            style={styles.orderBtnOutline} 
+            onPress={onView}
+          >
+            <Ionicons name="eye-outline" size={14} color={C.text} />
+            <Text style={styles.orderBtnTextOutline}>Ver detalles</Text>
+          </Pressable>
+          <Pressable 
+            style={styles.orderBtnOutline} 
+            onPress={onReorder}
+          >
+            <Ionicons name="refresh-outline" size={14} color={C.text} />
+            <Text style={styles.orderBtnTextOutline}>Reordenar</Text>
+          </Pressable>
         </View>
       </View>
     </View>
@@ -1071,14 +1249,54 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.03)',
   },
 
+  // Barra de progreso con degradado violeta a rosa
+  progressGradient: {
+    flex: 1,
+    height: '100%',
+    backgroundColor: C.primary,
+    borderRadius: 999,
+  },
+
+  // Botón editar perfil estilo web
+  editProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    marginTop: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.primary,
+    backgroundColor: 'rgba(124,58,237,0.1)',
+  },
+
   orderCard: {
     backgroundColor: C.card,
     borderColor: C.border,
     borderWidth: 1,
     borderRadius: 12,
-    padding: 12,
+    padding: 14,
   },
-  badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, borderWidth: 1 },
+  badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, borderWidth: 1 },
+
+  // Botones de orden estilo web
+  orderBtnOutline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: 'transparent',
+  },
+  orderBtnTextOutline: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.text,
+  },
 
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center', padding: 16 },

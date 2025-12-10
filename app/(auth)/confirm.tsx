@@ -1,3 +1,4 @@
+import { verifyEmail } from '@/lib/email-service';
 import { supabase } from '@/lib/supabase';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -14,7 +15,8 @@ const C = {
 };
 
 export default function ConfirmEmailScreen() {
-  const params = useLocalSearchParams<{ token_hash?: string; type?: string }>();
+  // Soporta ambos formatos: token (custom) y token_hash (Supabase)
+  const params = useLocalSearchParams<{ token?: string; token_hash?: string; type?: string }>();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Verificando tu email...');
 
@@ -24,56 +26,81 @@ export default function ConfirmEmailScreen() {
 
   async function handleConfirmation() {
     try {
+      const customToken = params.token;
       const tokenHash = params.token_hash;
       const type = params.type;
 
+      console.log('🔐 [Confirm] Custom token:', customToken?.substring(0, 10) + '...');
       console.log('🔐 [Confirm] Token hash:', tokenHash?.substring(0, 10) + '...');
       console.log('🔐 [Confirm] Type:', type);
 
-      if (!tokenHash || type !== 'email') {
-        setStatus('error');
-        setMessage('Link de verificación inválido');
-        Toast.show({ type: 'error', text1: 'Error', text2: 'Link de verificación inválido' });
-        setTimeout(() => router.replace('/(auth)'), 3000);
-        return;
-      }
+      // Caso 1: Token personalizado del backend (desde deep link)
+      if (customToken) {
+        console.log('🔐 [Confirm] Usando token personalizado...');
+        const result = await verifyEmail(customToken);
 
-      // Verificar email con Supabase
-      const { data, error } = await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: 'email',
-      });
-
-      if (error) {
-        console.error('❌ [Confirm] Error:', error);
-        setStatus('error');
-        setMessage('No se pudo verificar el email');
-        Toast.show({ type: 'error', text1: 'Error', text2: error.message });
-        setTimeout(() => router.replace('/(auth)'), 3000);
-        return;
-      }
-
-      console.log('✅ [Confirm] Email verificado exitosamente');
-      setStatus('success');
-      setMessage('¡Email verificado correctamente!');
-      Toast.show({ type: 'success', text1: '¡Éxito!', text2: 'Tu cuenta ha sido verificada' });
-
-      // Redirigir según el rol del usuario
-      setTimeout(async () => {
-        if (data.user) {
-          const { data: userRow } = await supabase
-            .from('User')
-            .select('role')
-            .eq('id', data.user.id)
-            .limit(1)
-            .maybeSingle();
-
-          const role = userRow?.role === 'admin' ? 'admin' : 'client';
-          router.replace(role === 'admin' ? '/(admin)' : '/(client)');
-        } else {
-          router.replace('/(auth)');
+        if (!result.success) {
+          setStatus('error');
+          setMessage(result.error || 'No se pudo verificar el email');
+          Toast.show({ type: 'error', text1: 'Error', text2: result.error });
+          setTimeout(() => router.replace('/(auth)'), 3000);
+          return;
         }
-      }, 2000);
+
+        console.log('✅ [Confirm] Email verificado exitosamente (custom token)');
+        setStatus('success');
+        setMessage('¡Email verificado correctamente!');
+        Toast.show({ type: 'success', text1: '¡Éxito!', text2: 'Tu cuenta ha sido verificada' });
+        setTimeout(() => router.replace('/(auth)'), 2000);
+        return;
+      }
+
+      // Caso 2: Token de Supabase (formato tradicional)
+      if (tokenHash && type === 'email') {
+        console.log('🔐 [Confirm] Usando token de Supabase...');
+        const { data, error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'email',
+        });
+
+        if (error) {
+          console.error('❌ [Confirm] Error Supabase:', error);
+          setStatus('error');
+          setMessage('No se pudo verificar el email');
+          Toast.show({ type: 'error', text1: 'Error', text2: error.message });
+          setTimeout(() => router.replace('/(auth)'), 3000);
+          return;
+        }
+
+        console.log('✅ [Confirm] Email verificado exitosamente (Supabase)');
+        setStatus('success');
+        setMessage('¡Email verificado correctamente!');
+        Toast.show({ type: 'success', text1: '¡Éxito!', text2: 'Tu cuenta ha sido verificada' });
+
+        // Redirigir según el rol del usuario
+        setTimeout(async () => {
+          if (data.user) {
+            const { data: userRow } = await supabase
+              .from('User')
+              .select('role')
+              .eq('id', data.user.id)
+              .limit(1)
+              .maybeSingle();
+
+            const role = userRow?.role === 'admin' ? 'admin' : 'client';
+            router.replace(role === 'admin' ? '/(admin)' : '/(client)');
+          } else {
+            router.replace('/(auth)');
+          }
+        }, 2000);
+        return;
+      }
+
+      // Sin token válido
+      setStatus('error');
+      setMessage('Link de verificación inválido');
+      Toast.show({ type: 'error', text1: 'Error', text2: 'Link de verificación inválido' });
+      setTimeout(() => router.replace('/(auth)'), 3000);
 
     } catch (err: any) {
       console.error('❌ [Confirm] Error inesperado:', err);

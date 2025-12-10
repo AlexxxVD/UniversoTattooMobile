@@ -224,7 +224,7 @@ export function MenuDrawerProvider({
                           pack={it.icon.pack}
                           name={it.icon.name}
                           color={it.icon.color ?? C.muted}
-                          size={it.icon.size ?? 20}
+                          size={it.icon.size ?? 24}
                         />
                       ) : null}
                       <Text style={styles.itemText}>{it.label}</Text>
@@ -251,7 +251,7 @@ export function MenuDrawerProvider({
                   </View>
                 ) : (
                   <View style={styles.row}>
-                    <Ionicons name="log-out-outline" size={18} color={C.danger} />
+                    <Ionicons name="log-out-outline" size={22} color={C.danger} />
                     <Text style={styles.logoutText}> {logoutLabel}</Text>
                   </View>
                 )}
@@ -314,10 +314,10 @@ const styles = StyleSheet.create({
   },
   currentLabel: { fontWeight: '800', color: C.text },
 
-  items: { marginTop: 8, gap: 6 },
-  item: { paddingVertical: 12, paddingHorizontal: 8, borderRadius: 10 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  itemText: { fontSize: 16, color: C.text },
+  items: { marginTop: 8, gap: 8 },
+  item: { paddingVertical: 14, paddingHorizontal: 12, borderRadius: 12 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  itemText: { fontSize: 17, fontWeight: '500', color: C.text },
 
   footer: { marginTop: 'auto', paddingVertical: 8, paddingHorizontal: 4 },
   logoutButton: {
