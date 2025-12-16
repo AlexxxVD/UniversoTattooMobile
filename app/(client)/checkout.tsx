@@ -3,17 +3,17 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  useWindowDimensions,
-  View,
+    Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    useWindowDimensions,
+    View,
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import { apiPost } from '../../lib/api';
@@ -417,31 +417,11 @@ export default function CheckoutScreen() {
       if (cliSelErr) {
         console.warn('[checkout] cliente select error:', cliSelErr);
       }
-      if (cli) cliente = cli;
-      else {
-        const { data: newCli, error: cliErr } = await supabase
-          .from('Cliente')
-          .insert({
-            userId: user.id,
-            email: user.email!,
-            nombre: formData.firstName || 'Cliente',
-            apellido: formData.lastName || '',
-            telefono: formData.phone || '',
-            dni: formData.dni || '',
-            direccion: formData.calle ? `${formData.calle} ${formData.numero}` : null,
-            ciudad: formData.city || null,
-            provincia: formData.province || null,
-            codigo_postal: formData.postalCode || null,
-            acepta_marketing: false,
-          })
-          .select('*')
-          .single();
-        if (cliErr) {
-          console.error('[checkout] cliente insert error:', cliErr);
-          throw cliErr;
-        }
-        cliente = newCli;
+      if (cli) {
+        cliente = cli;
       }
+      // Nota: No intentamos crear Cliente desde mobile por restricciones de RLS
+      // El pedido se puede crear sin cliente_id (será null)
     }
 
     const numeroPedido = `PED-${Date.now()}`;
@@ -814,10 +794,13 @@ export default function CheckoutScreen() {
                 </View>
                 <View style={styles.row}>
                   <Field label="Ciudad" value={formData.city} onChangeText={(v) => handleInputChange('city', v)} style={{ flex: 1 }} />
-                  <Pressable onPress={() => setProvPicker(true)} style={[styles.select, { flex: 1 }]}>
-                    <Text style={styles.selectText}>{formData.province || 'Provincia'}</Text>
-                    <Ionicons name="chevron-down" size={16} color={C.muted} />
-                  </Pressable>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.label}>Provincia</Text>
+                    <Pressable onPress={() => setProvPicker(true)} style={styles.select}>
+                      <Text style={styles.selectText}>{formData.province || 'Seleccionar'}</Text>
+                      <Ionicons name="chevron-down" size={16} color={C.muted} />
+                    </Pressable>
+                  </View>
                 </View>
                 <Field label="Código postal (4 dígitos)" value={formData.postalCode} onChangeText={(v) => handleInputChange('postalCode', v)} keyboardType="numeric" />
                 {!!provinceError && <Text style={styles.warnText}>{provinceError}</Text>}

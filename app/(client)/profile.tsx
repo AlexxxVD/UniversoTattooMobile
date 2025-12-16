@@ -1,18 +1,20 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ActivityIndicator,
-    FlatList,
-    Image,
-    Modal,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View
 } from 'react-native';
 import { SafeAreaView as RNSafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -91,6 +93,7 @@ export default function ProfileScreen() {
   // Edit profile
   const [showEdit, setShowEdit] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [edit, setEdit] = useState({
     nombre: '',
     apellido: '',
@@ -210,43 +213,11 @@ export default function ProfileScreen() {
       if (clienteErr) throw clienteErr;
       
       if (!clienteRow) {
-        // Intentar crear el registro de Cliente
-        const user = data.session?.user;
-        const meta = user?.user_metadata || {};
-        const firstName = (meta.firstName || meta.name || '').toString().trim();
-        const lastName = (meta.lastName || '').toString().trim();
-        const phone = (meta.phone || '').toString().trim() || null;
-        const address = (meta.address || '').toString().trim() || null;
-
-        const { data: newCliente, error: insertError } = await supabase
-          .from('Cliente')
-          .insert({
-            userId: uid,
-            nombre: firstName || 'Usuario',
-            apellido: lastName || 'Apellido',
-            email: user?.email || '',
-            telefono: phone,
-            calle: address,
-            acepta_marketing: false,
-          })
-          .select('*')
-          .single();
-
-        if (insertError) {
-          Toast.show({ 
-            type: 'error', 
-            text1: 'Error al crear perfil',
-            text2: 'Por favor, contactá a soporte'
-          });
-          setCliente(null);
-        } else {
-          Toast.show({ 
-            type: 'success', 
-            text1: 'Perfil creado',
-            text2: 'Ahora podés editar tu información'
-          });
-          setCliente((newCliente as any) ?? null);
-        }
+        // No hay registro de Cliente para este usuario
+        // Esto puede pasar si el usuario se registró desde mobile pero no completó
+        // el perfil en la web. Mostraremos un mensaje apropiado en la UI.
+        console.log('[profile] Cliente no encontrado para userId:', uid);
+        setCliente(null);
       } else {
         setCliente((clienteRow as any) ?? null);
       }
@@ -577,6 +548,67 @@ export default function ProfileScreen() {
     );
   }
 
+  // Si no hay Cliente, mostrar mensaje para completar perfil en la web
+  if (!cliente) {
+    return (
+      <RNSafeAreaView style={{ flex: 1, backgroundColor: C.bg }} edges={['top', 'right', 'bottom', 'left']}>
+        <ScrollView contentContainerStyle={{ padding: 16, gap: 16, flex: 1, justifyContent: 'center' }}>
+          <View style={{ alignItems: 'center', gap: 12 }}>
+            <View style={[styles.avatar, { width: 80, height: 80, borderRadius: 40 }]}>
+              <Ionicons name="person-outline" size={40} color="#C4B5FD" />
+            </View>
+            <Text style={{ color: C.text, fontSize: 20, fontWeight: '800', textAlign: 'center' }}>
+              ¡Hola, {userEmail?.split('@')[0] || 'Usuario'}!
+            </Text>
+            <Text style={{ color: C.muted, textAlign: 'center', lineHeight: 22 }}>
+              Para ver y editar tu perfil completo, necesitás completar tu información en nuestra web.
+            </Text>
+          </View>
+          
+          <Card>
+            <View style={{ padding: 16, gap: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Ionicons name="information-circle-outline" size={24} color={C.primary} />
+                <Text style={{ color: C.text, fontWeight: '700', fontSize: 16 }}>Completá tu perfil</Text>
+              </View>
+              <Text style={{ color: C.muted, lineHeight: 20 }}>
+                Visitá www.universotattoo.com.ar e iniciá sesión para completar tu información de perfil y poder realizar pedidos.
+              </Text>
+              <View style={{ marginTop: 8, padding: 12, backgroundColor: C.primarySoft, borderRadius: 10 }}>
+                <Text style={{ color: '#C4B5FD', fontSize: 13, textAlign: 'center' }}>
+                  www.universotattoo.com.ar
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          <Pressable
+            onPress={async () => {
+              await supabase.auth.signOut();
+              router.replace('/(auth)');
+            }}
+            style={({ pressed }) => [
+              { 
+                flexDirection: 'row', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                gap: 8, 
+                paddingVertical: 14, 
+                borderRadius: 12, 
+                borderWidth: 1, 
+                borderColor: C.border,
+                backgroundColor: pressed ? 'rgba(255,255,255,0.05)' : 'transparent'
+              }
+            ]}
+          >
+            <Ionicons name="log-out-outline" size={18} color={C.muted} />
+            <Text style={{ color: C.muted, fontWeight: '600' }}>Cerrar sesión</Text>
+          </Pressable>
+        </ScrollView>
+      </RNSafeAreaView>
+    );
+  }
+
   const fullName = cliente ? `${cliente.nombre ?? ''} ${cliente.apellido ?? ''}`.trim() || 'Usuario' : 'Usuario';
 
   return (
@@ -801,7 +833,61 @@ export default function ProfileScreen() {
                 </Row>
                 <LabeledInput label="Email *" keyboardType="email-address" autoCapitalize="none" value={edit.email} onChangeText={(t) => setEdit((s) => ({ ...s, email: t }))} />
                 <LabeledInput label="Teléfono" keyboardType="phone-pad" placeholder="+54 9 11 1234-5678" value={edit.telefono} onChangeText={(t) => setEdit((s) => ({ ...s, telefono: t }))} />
-                <LabeledInput label="Fecha de nacimiento" placeholder="1990-10-05 (AAAA-MM-DD)" value={edit.fecha_nacimiento} onChangeText={(t) => setEdit((s) => ({ ...s, fecha_nacimiento: t }))} />
+                <View style={{ gap: 4 }}>
+                  <Text style={{ color: C.muted, fontSize: 13 }}>Fecha de nacimiento</Text>
+                  <Pressable
+                    onPress={() => setShowDatePicker(true)}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: '#11151B',
+                      borderWidth: 1,
+                      borderColor: C.border,
+                      borderRadius: 8,
+                      padding: 12,
+                    }}
+                  >
+                    <Text style={{ color: edit.fecha_nacimiento ? C.text : C.muted, fontSize: 15 }}>
+                      {edit.fecha_nacimiento || 'Seleccionar fecha'}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={20} color={C.muted} />
+                  </Pressable>
+                  {showDatePicker && (
+                    <DateTimePicker
+                      value={edit.fecha_nacimiento ? new Date(edit.fecha_nacimiento) : new Date(2000, 0, 1)}
+                      mode="date"
+                      display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                      maximumDate={new Date()}
+                      minimumDate={new Date(1920, 0, 1)}
+                      onChange={(event: DateTimePickerEvent, selectedDate?: Date) => {
+                        if (Platform.OS === 'android') {
+                          setShowDatePicker(false);
+                        }
+                        if (event.type === 'set' && selectedDate) {
+                          const year = selectedDate.getFullYear();
+                          const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                          const day = String(selectedDate.getDate()).padStart(2, '0');
+                          setEdit((s) => ({ ...s, fecha_nacimiento: `${year}-${month}-${day}` }));
+                        }
+                      }}
+                    />
+                  )}
+                  {Platform.OS === 'ios' && showDatePicker && (
+                    <Pressable
+                      onPress={() => setShowDatePicker(false)}
+                      style={{
+                        backgroundColor: C.primary,
+                        padding: 10,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                        marginTop: 8,
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '600' }}>Listo</Text>
+                    </Pressable>
+                  )}
+                </View>
                 <View style={{ backgroundColor: C.card, padding: 12, borderRadius: 8, borderWidth: 1, borderColor: C.border }}>
                   <ToggleRow label="Newsletter (recibir ofertas y novedades)" value={edit.acepta_marketing} onValueChange={(v) => setEdit((s) => ({ ...s, acepta_marketing: v }))} />
                 </View>

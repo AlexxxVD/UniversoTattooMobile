@@ -115,7 +115,7 @@ export default function CartScreen() {
         </View>
         <Text style={styles.emptyTitle}>Tu carrito está vacío</Text>
         <Text style={styles.emptyText}>Explorá nuestro catálogo y encontrá lo que necesitás.</Text>
-        <Pressable onPress={() => router.push('/(client)')} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}>
+        <Pressable onPress={() => router.push('/(client)/store')} style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}>
           <Ionicons name="cube-outline" size={16} color="#fff" />
           <Text style={styles.primaryText}>Explorar productos</Text>
         </Pressable>
@@ -138,7 +138,7 @@ export default function CartScreen() {
           return (
             <View style={styles.card}>
               <View style={styles.row}>
-                <Image source={{ uri: img }} style={styles.thumb} />
+                <Image source={{ uri: img }} style={styles.thumb} resizeMode="cover" />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemName} numberOfLines={1}>
                     {item.nombre || 'Producto sin nombre'}
@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0B0B0F' },
   header: { gap: 10, marginBottom: 8 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  headerIcon: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
+  headerIcon: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: '#fff', fontSize: 22, fontWeight: '800' },
   headerSubtitle: { color: '#9CA3AF' },
   headerActions: { flexDirection: 'row', gap: 10 },
@@ -312,7 +312,7 @@ const styles = StyleSheet.create({
 
   card: { backgroundColor: 'rgba(24,24,27,0.7)', borderWidth: 1, borderColor: '#27272A', borderRadius: 12, padding: 10 },
   row: { flexDirection: 'row', gap: 10 },
-  thumb: { width: 64, height: 64, borderRadius: 8, backgroundColor: '#18181B' },
+  thumb: { width: 72, height: 72, borderRadius: 10, backgroundColor: '#18181B' },
   itemName: { color: '#fff', fontSize: 16, fontWeight: '700' },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   badge: { borderWidth: 1, borderColor: 'rgba(168,85,247,0.3)', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 },

@@ -3,17 +3,17 @@ import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import { supabase } from '../../lib/supabase';
@@ -70,30 +70,53 @@ export default function AuthScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const user = data.session?.user;
-        if (user) {
-          const { data: userRow } = await supabase
-            .from('User')
-            .select('role')
-            .eq('id', user.id)
-            .limit(1)
-            .maybeSingle();
-          const role = userRow?.role === 'admin' ? 'admin' : 'client';
-
-          Toast.show({
-            type: 'success',
-            text1: 'Sesión activa',
-            text2: 'Redirigiendo...',
-          });
-
-          if (role === 'admin') router.replace('/(admin)' as Href);
-          else router.replace('/(client)' as Href);
+        console.log('[login] Verificando sesión...');
+        const { data, error } = await supabase.auth.getSession();
+        console.log('[login] getSession result:', { 
+          hasSession: !!data.session, 
+          hasUser: !!data.session?.user,
+          hasToken: !!data.session?.access_token,
+          error: error?.message 
+        });
+        
+        // Si hay error o no hay sesión válida, no redirigir
+        if (error || !data.session?.user || !data.session?.access_token) {
+          console.log('[login] No hay sesión válida, mostrando login');
+          setChecking(false);
           return;
         }
+        const user = data.session.user;
+        
+        // Verificar que el token no esté expirado
+        const expiresAt = data.session.expires_at;
+        if (expiresAt && expiresAt * 1000 < Date.now()) {
+          console.log('[login] Sesión expirada, haciendo signOut');
+          await supabase.auth.signOut();
+          setChecking(false);
+          return;
+        }
+
+        console.log('[login] Sesión válida encontrada, buscando rol...');
+        const { data: userRow } = await supabase
+          .from('User')
+          .select('role')
+          .eq('id', user.id)
+          .limit(1)
+          .maybeSingle();
+        const role = userRow?.role === 'admin' ? 'admin' : 'client';
+
+        console.log('[login] Redirigiendo a:', role);
+        Toast.show({
+          type: 'success',
+          text1: 'Sesión activa',
+          text2: 'Redirigiendo...',
+        });
+
+        if (role === 'admin') router.replace('/(admin)' as Href);
+        else router.replace('/(client)' as Href);
+        return;
       } catch (e) {
         console.warn('[login] session check error:', (e as any)?.message ?? e);
-      } finally {
         setChecking(false);
       }
     })();

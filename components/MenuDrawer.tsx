@@ -171,13 +171,15 @@ export function MenuDrawerProvider({
     setSigningOut(true);
     try {
       if (onLogout) await onLogout();
+      // Esperar un momento para asegurar que la sesión se limpie
+      await new Promise(resolve => setTimeout(resolve, 300));
     } catch (e) {
-      // noop
-    } finally {
-      runOnJS(setSigningOut)(false);
-      runOnJS(closeMenu)();
-      router.replace('/(auth)' as Href);
+      console.warn('[MenuDrawer] Error en logout:', e);
     }
+    // Navegar después de que signOut se complete
+    runOnJS(setSigningOut)(false);
+    runOnJS(closeMenu)();
+    router.replace('/(auth)' as Href);
   };
 
   return (

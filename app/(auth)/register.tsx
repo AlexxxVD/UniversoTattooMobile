@@ -4,17 +4,17 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View
+    ActivityIndicator,
+    Keyboard,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 
@@ -72,16 +72,27 @@ export default function RegisterScreen() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        const user = data.session?.user;
-        if (user) {
-          const { data: row } = await supabase.from('User').select('role').eq('id', user.id).limit(1).maybeSingle();
-          const role = row?.role === 'admin' ? 'admin' : 'client';
-          Toast.show({ type: 'success', text1: 'Ya tenés sesión activa', text2: 'Redirigiendo...' });
-          if (role === 'admin') expoRouter.replace('/(admin)');
-          else expoRouter.replace('/(client)');
+        const { data, error } = await supabase.auth.getSession();
+        // Si hay error o no hay sesión válida, no redirigir
+        if (error || !data.session?.user || !data.session?.access_token) {
           return;
         }
+        const user = data.session.user;
+        
+        // Verificar que el token no esté expirado
+        const expiresAt = data.session.expires_at;
+        if (expiresAt && expiresAt * 1000 < Date.now()) {
+          console.log('[register] Sesión expirada, no redirigir');
+          await supabase.auth.signOut();
+          return;
+        }
+
+        const { data: row } = await supabase.from('User').select('role').eq('id', user.id).limit(1).maybeSingle();
+        const role = row?.role === 'admin' ? 'admin' : 'client';
+        Toast.show({ type: 'success', text1: 'Ya tenés sesión activa', text2: 'Redirigiendo...' });
+        if (role === 'admin') expoRouter.replace('/(admin)');
+        else expoRouter.replace('/(client)');
+        return;
       } catch {
         // no bloquear
       } finally {
@@ -123,7 +134,12 @@ export default function RegisterScreen() {
     setStep(2);
   };
 
-  const goPrev = () => setStep(1);
+  const goPrev = () => {
+    // Limpiar contraseñas al volver
+    onChange('password', '');
+    onChange('confirmPassword', '');
+    setStep(1);
+  };
 
   const handleRegister = async () => {
     const err2 = validateStep2();
@@ -135,29 +151,47 @@ export default function RegisterScreen() {
     setSubmitting(true);
     try {
       const email = values.email.trim().toLowerCase();
+      const fullName = `${values.name.trim()} ${values.lastName.trim()}`;
 
-      // Usar la API web para el registro (evita problemas con triggers de Supabase)
-      const response = await fetch(`${WEB_API_BASE}/api/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      // Verificar si el email ya existe en la tabla User
+      const { data: existingUser } = await supabase
+        .from('User')
+        .select('id, email')
+        .eq('email', email)
+        .maybeSingle();
+
+      if (existingUser) {
+        Toast.show({ 
+          type: 'error', 
+          text1: 'Email ya registrado', 
+          text2: 'Podés recuperar tu contraseña si la olvidaste' 
+        });
+        setSubmitting(false);
+        return;
+      }
+
+      // Registrar con Supabase Auth (sin confirmación de email automática)
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password: values.password,
+        options: {
+          data: {
+            name: values.name.trim(),
+            lastName: values.lastName.trim(),
+            full_name: fullName,
+            phone: values.phone.trim() || null,
+            address: values.address.trim() || null,
+            role: 'user',
+          },
+          // No enviamos emailRedirectTo para evitar que Supabase envíe email
         },
-        body: JSON.stringify({
-          name: values.name.trim(),
-          lastName: values.lastName.trim(),
-          email,
-          password: values.password,
-          phone: values.phone.trim() || undefined,
-          address: values.address.trim() || undefined,
-          acceptTerms: values.acceptTerms,
-        }),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
+      if (signUpError) {
+        console.error('[Register] Supabase Auth error:', signUpError);
+        
         // Manejar errores específicos
-        if (data.code === 'EMAIL_ALREADY_EXISTS') {
+        if (signUpError.message.includes('already registered') || signUpError.message.includes('already exists')) {
           Toast.show({ 
             type: 'error', 
             text1: 'Email ya registrado', 
@@ -165,19 +199,73 @@ export default function RegisterScreen() {
           });
           return;
         }
+
+        if (signUpError.message.includes('Database error')) {
+          // Este error ocurre cuando Supabase intenta enviar email de confirmación
+          // Probablemente hay que desactivar "Confirm email" en Supabase Auth settings
+          Toast.show({ 
+            type: 'error', 
+            text1: 'Error de configuración', 
+            text2: 'Contactá al soporte técnico' 
+          });
+          return;
+        }
+        
         Toast.show({ 
           type: 'error', 
           text1: 'No se pudo crear la cuenta', 
-          text2: data.error || 'Error desconocido' 
+          text2: signUpError.message || 'Error desconocido' 
         });
         return;
+      }
+
+      // Verificar si el usuario fue creado
+      if (!signUpData.user) {
+        Toast.show({ 
+          type: 'error', 
+          text1: 'Error', 
+          text2: 'No se pudo crear el usuario' 
+        });
+        return;
+      }
+
+      // Enviar email de verificación usando Resend (a través de la web)
+      try {
+        const emailResponse = await fetch(`${WEB_API_BASE}/api/resend-verification`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        
+        if (!emailResponse.ok) {
+          const emailData = await emailResponse.json();
+          console.warn('[Register] Error enviando email de verificación:', emailData);
+        }
+      } catch (emailErr) {
+        console.warn('[Register] Error llamando API de verificación:', emailErr);
+      }
+
+      // También enviar email de "establecer contraseña" para que pueda usar la web
+      // Esto es necesario porque el trigger de Supabase crea el User SIN password
+      try {
+        const resetResponse = await fetch(`${WEB_API_BASE}/api/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        
+        if (!resetResponse.ok) {
+          console.warn('[Register] Error enviando email de establecer contraseña');
+        }
+      } catch (resetErr) {
+        console.warn('[Register] Error llamando API forgot-password:', resetErr);
       }
 
       // Registro exitoso - redirigir a verificar email
       Toast.show({ 
         type: 'success', 
         text1: 'Cuenta creada', 
-        text2: 'Te enviamos un email para verificar tu cuenta' 
+        text2: 'Revisá tu correo para verificar y establecer tu contraseña' 
       });
       router.replace({ pathname: '/(auth)/verify-pending', params: { email } } as any);
 
@@ -266,6 +354,9 @@ export default function RegisterScreen() {
                     secureTextEntry={!showPwd}
                     value={values.password}
                     onChangeText={(t) => onChange('password', t)}
+                    autoComplete="off"
+                    textContentType="oneTimeCode"
+                    autoCorrect={false}
                   />
                   <Pressable onPress={() => setShowPwd((s) => !s)} hitSlop={8}>
                     <Ionicons name={showPwd ? 'eye-off-outline' : 'eye-outline'} size={20} color={C.primary} />
@@ -344,6 +435,9 @@ export default function RegisterScreen() {
                     secureTextEntry={!showConfirmPwd}
                     value={values.confirmPassword}
                     onChangeText={(t) => onChange('confirmPassword', t)}
+                    autoComplete="off"
+                    textContentType="oneTimeCode"
+                    autoCorrect={false}
                   />
                   <Pressable onPress={() => setShowConfirmPwd((s) => !s)} hitSlop={8}>
                     <Ionicons name={showConfirmPwd ? 'eye-off-outline' : 'eye-outline'} size={20} color={C.primary} />
@@ -491,7 +585,7 @@ const styles = StyleSheet.create({
   link: { color: C.primary },
 
   // Botones
-  btnPrimary: { backgroundColor: C.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  btnPrimary: { flex: 1, backgroundColor: C.primary, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   btnGhost: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.border, backgroundColor: '#11151B' },
   btnText: { color: '#fff', fontWeight: '700' },
 });

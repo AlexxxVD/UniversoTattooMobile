@@ -1,4 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
@@ -94,7 +95,26 @@ export default function ClientLayout() {
   ];
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    console.log('[Layout] Iniciando signOut...');
+    try {
+      // Primero intentar signOut normal
+      await supabase.auth.signOut();
+      console.log('[Layout] signOut completado');
+    } catch (error: any) {
+      console.log('[Layout] Error en signOut (ignorando):', error?.message);
+    }
+    
+    // Forzar limpieza del storage de Supabase
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const supabaseKeys = keys.filter(k => k.includes('supabase') || k.includes('sb-'));
+      if (supabaseKeys.length > 0) {
+        await AsyncStorage.multiRemove(supabaseKeys);
+        console.log('[Layout] Storage de Supabase limpiado:', supabaseKeys);
+      }
+    } catch (storageError) {
+      console.log('[Layout] Error limpiando storage:', storageError);
+    }
   };
 
   return (

@@ -244,6 +244,13 @@ export default function ShopScreen() {
     else if (sort === 'price-desc') arr.sort((a, b) => b.precio - a.precio);
     else if (sort === 'name-asc') arr.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
+    // Siempre poner productos sin stock al final
+    arr.sort((a, b) => {
+      const aHasStock = (a.stock ?? 0) > 0 ? 1 : 0;
+      const bHasStock = (b.stock ?? 0) > 0 ? 1 : 0;
+      return bHasStock - aHasStock; // productos con stock primero
+    });
+
     return arr;
   }, [items, search, categoryFilter, minPrice, maxPrice, sort]);
 
