@@ -819,7 +819,7 @@ export default function ProfileScreen() {
               <Pressable onPress={() => setShowEdit(false)} hitSlop={8} style={{ padding: 4 }}>
                 <Ionicons name="close" size={24} color={C.muted} />
               </Pressable>
-            </View>
+            </View> 
 
             <ScrollView contentContainerStyle={{ gap: 16, paddingTop: 16, paddingBottom: 8 }} showsVerticalScrollIndicator={false}>
               <View style={{ gap: 4 }}>

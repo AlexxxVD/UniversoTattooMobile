@@ -157,14 +157,14 @@ export async function verifyEmail(token: string): Promise<EmailResponse> {
 /**
  * Enviar email de confirmación de orden
  */
-export async function sendOrderConfirmation(orderNumber: string): Promise<EmailResponse> {
+export async function sendOrderConfirmation(orderData: any): Promise<EmailResponse> {
   try {
     const response = await fetch(`${WEB_API_BASE}/api/orders/send-confirmation`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ orderNumber }),
+      body: JSON.stringify(orderData),
     });
 
     const data = await response.json();

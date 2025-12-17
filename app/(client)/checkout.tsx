@@ -635,7 +635,32 @@ export default function CheckoutScreen() {
         }
 
         // Enviar email de confirmación (no bloquea el flujo si falla)
-        sendOrderConfirmation(orderNumber).catch((err) => {
+        const confirmationData = {
+          customerEmail: formData.email,
+          customerName: `${formData.firstName} ${formData.lastName}`,
+          orderNumber: orderNumber,
+          orderDate: new Date().toISOString(),
+          items: orderSummary.items,
+          shippingAddress: (shippingMethod === 'delivery') ? {
+            calle: formData.calle,
+            numero: formData.numero,
+            departamento: formData.departamento,
+            barrio: formData.barrio,
+            city: formData.city,
+            province: formData.province,
+            postalCode: formData.postalCode,
+          } : null,
+          shippingMethod,
+          selectedBranch: shippingMethod === 'branch' ? selectedBranch : null,
+          paymentMethod: paymentMethod === 'transfer' ? 'Transferencia' : paymentMethod === 'cash' ? 'Efectivo' : 'MercadoPago',
+          subtotal: orderSummary.subtotal,
+          shipping: orderSummary.shipping,
+          discount: orderSummary.discount,
+          total: orderSummary.total,
+          notes: formData.notes,
+        };
+
+        sendOrderConfirmation(confirmationData).catch((err) => {
           console.warn('[checkout] Email de confirmación no enviado:', err);
         });
 

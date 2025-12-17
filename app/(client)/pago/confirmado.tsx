@@ -244,17 +244,44 @@ export default function PagoConfirmadoScreen() {
 
         {/* Payment Info for Transferencia */}
         {order.metodo_pago === 'TRANSFERENCIA' && order.estado_pago === 'PENDIENTE' && (
-          <View style={[styles.card, styles.warningCard]}>
+          <View style={[styles.card, { borderColor: C.primary, backgroundColor: 'rgba(124,58,237,0.05)' }]}>
             <View style={styles.cardHeader}>
-              <Ionicons name="information-circle" size={20} color={C.warning} />
-              <Text style={[styles.cardTitle, { color: C.warning }]}>Información de pago</Text>
+              <Ionicons name="card-outline" size={20} color={C.primary} />
+              <Text style={[styles.cardTitle, { color: C.primary }]}>Datos para transferencia</Text>
             </View>
-            <Text style={styles.text}>
-              Te enviamos los datos para realizar la transferencia bancaria a tu email.
-            </Text>
-            <Text style={[styles.text, { marginTop: 8 }]}>
-              Una vez acreditado el pago, procesaremos tu pedido.
-            </Text>
+            
+            <View style={{ gap: 8, marginTop: 4 }}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Banco</Text>
+                <Text style={styles.detailValue}>Mercado Pago</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Titular</Text>
+                <Text style={styles.detailValue}>Maria Carolina Roude</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>CUIT</Text>
+                <Text style={styles.detailValue}>27-26306559-5</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>CBU</Text>
+                <Text style={styles.detailValue}>0000003100035600129127</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Alias</Text>
+                <Text style={styles.detailValue}>amoruniverso859</Text>
+              </View>
+              <View style={[styles.detailRow, { marginTop: 4 }]}>
+                <Text style={styles.detailLabel}>Monto a transferir</Text>
+                <Text style={[styles.detailValue, { color: C.primary, fontSize: 16 }]}>{money(order.total)}</Text>
+              </View>
+            </View>
+
+            <View style={{ marginTop: 12, padding: 10, backgroundColor: 'rgba(124,58,237,0.1)', borderRadius: 8 }}>
+              <Text style={[styles.text, { fontSize: 12, color: C.primary }]}>
+                Por favor enviá el comprobante por WhatsApp indicando tu número de pedido #{order.numero_pedido}
+              </Text>
+            </View>
           </View>
         )}
 
