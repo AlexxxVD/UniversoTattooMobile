@@ -634,37 +634,8 @@ export default function CheckoutScreen() {
           throw new Error(`No se recibió el número de pedido. Respuesta: ${JSON.stringify(orderRes)}`);
         }
 
-        // Enviar email de confirmación (no bloquea el flujo si falla)
-        const confirmationData = {
-          customerEmail: formData.email,
-          customerName: `${formData.firstName} ${formData.lastName}`,
-          orderNumber: orderNumber,
-          orderDate: new Date().toISOString(),
-          items: orderSummary.items,
-          shippingAddress: (shippingMethod === 'delivery') ? {
-            calle: formData.calle,
-            numero: formData.numero,
-            departamento: formData.departamento,
-            barrio: formData.barrio,
-            city: formData.city,
-            province: formData.province,
-            postalCode: formData.postalCode,
-          } : null,
-          shippingMethod,
-          selectedBranch: shippingMethod === 'branch' ? selectedBranch : null,
-          paymentMethod: paymentMethod === 'transfer' ? 'Transferencia' : paymentMethod === 'cash' ? 'Efectivo' : 'MercadoPago',
-          subtotal: orderSummary.subtotal,
-          shipping: orderSummary.shipping,
-          discount: orderSummary.discount,
-          total: orderSummary.total,
-          notes: formData.notes,
-        };
-
-        sendOrderConfirmation(confirmationData).catch((err) => {
-          console.warn('[checkout] Email de confirmación no enviado:', err);
-        });
-
         // 3. Si es Mercado Pago, crear preferencia y redirigir
+        // NOTA: El email de confirmación se enviará DESPUÉS cuando se verifique el pago
         if (paymentMethod === 'mercadopago') {
 
           const preferencePayload = {
@@ -720,7 +691,36 @@ export default function CheckoutScreen() {
             throw new Error('No se pudo obtener el link de pago de Mercado Pago');
           }
         } else {
-          // 4. Para transferencia o efectivo, mostrar confirmación
+          // 4. Para transferencia o efectivo, enviar email y mostrar confirmación
+          const confirmationData = {
+            customerEmail: formData.email,
+            customerName: `${formData.firstName} ${formData.lastName}`,
+            orderNumber: orderNumber,
+            orderDate: new Date().toISOString(),
+            items: orderSummary.items,
+            shippingAddress: (shippingMethod === 'delivery') ? {
+              calle: formData.calle,
+              numero: formData.numero,
+              departamento: formData.departamento,
+              barrio: formData.barrio,
+              city: formData.city,
+              province: formData.province,
+              postalCode: formData.postalCode,
+            } : null,
+            shippingMethod,
+            selectedBranch: shippingMethod === 'branch' ? selectedBranch : null,
+            paymentMethod: paymentMethod === 'transfer' ? 'Transferencia' : 'Efectivo',
+            subtotal: orderSummary.subtotal,
+            shipping: orderSummary.shipping,
+            discount: orderSummary.discount,
+            total: orderSummary.total,
+            notes: formData.notes,
+          };
+
+          sendOrderConfirmation(confirmationData).catch((err) => {
+            console.warn('[checkout] Email de confirmación no enviado:', err);
+          });
+
           clearCart();
           
           // Redirigir a la pantalla de confirmación

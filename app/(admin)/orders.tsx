@@ -2,16 +2,16 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
+    ActivityIndicator,
+    FlatList,
+    Modal,
+    Pressable,
+    RefreshControl,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Toast from 'react-native-toast-message';
@@ -1439,10 +1439,44 @@ function OrderDetailsModal({
   const [editData, setEditData] = useState({
     estado: order.estado,
     estado_pago: order.estado_pago,
-    tracking_number: order.tracking_number || '',
     metodo_pago: order.metodo_pago || '',
   });
   const [saving, setSaving] = useState(false);
+  const [productos, setProductos] = useState<any[]>([]);
+  const [loadingProductos, setLoadingProductos] = useState(true);
+
+  // Cargar productos del pedido
+  useEffect(() => {
+    if (visible) {
+      loadProductos();
+    }
+  }, [visible, order.id_pedido]);
+
+  const loadProductos = async () => {
+    setLoadingProductos(true);
+    try {
+      const { data, error } = await supabase
+        .from('PedidoProducto')
+        .select(`
+          *,
+          Producto(
+            id_producto,
+            nombre,
+            sku,
+            ProductoImagen(url_imagen, es_principal)
+          )
+        `)
+        .eq('pedidoId', order.id_pedido);
+
+      if (error) throw error;
+      setProductos(data || []);
+    } catch (error: any) {
+      console.error('Error cargando productos:', error);
+      Toast.show({ type: 'error', text1: 'Error cargando productos' });
+    } finally {
+      setLoadingProductos(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', {
@@ -1470,7 +1504,6 @@ function OrderDetailsModal({
         .update({
           estado: editData.estado,
           estado_pago: editData.estado_pago,
-          tracking_number: editData.tracking_number || null,
           metodo_pago: editData.metodo_pago || null,
           fecha_actualizacion: new Date().toISOString(),
         })
@@ -1587,6 +1620,60 @@ function OrderDetailsModal({
             </View>
           </View>
 
+          {/* Productos del Pedido */}
+          <View style={styles.detailCard}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <Ionicons name="cube" size={18} color={C.primary} />
+              <Text style={styles.detailCardTitle}>Productos ({productos.length})</Text>
+            </View>
+             
+            {loadingProductos ? (
+              <View style={{ padding: 20, alignItems: 'center' }}>
+                <ActivityIndicator color={C.primary} />
+              </View>
+            ) : productos.length === 0 ? (
+              <Text style={[styles.detailText, { color: C.muted, textAlign: 'center', padding: 20 }]}>
+                No hay productos en este pedido
+              </Text>
+            ) : (
+              <View style={{ gap: 8 }}>
+                {productos.map((item: any, index: number) => (
+                  <View 
+                    key={index}
+                    style={{
+                      flexDirection: 'row',
+                      padding: 10,
+                      backgroundColor: C.bg,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: C.border,
+                      gap: 10,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.detailText, { fontWeight: '700', marginBottom: 4 }]}>
+                        {item.Producto?.nombre || 'Producto sin nombre'}
+                      </Text>
+                      {item.Producto?.sku && (
+                        <Text style={[styles.detailText, { fontSize: 11, color: C.muted }]}>
+                          SKU: {item.Producto.sku}
+                        </Text>
+                      )}
+                      <Text style={[styles.detailText, { fontSize: 12, marginTop: 4 }]}>
+                        Cantidad: {item.cantidad} × {formatCurrency(item.precio_unitario)}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                      <Text style={[styles.detailText, { fontWeight: '800', color: C.success }]}>
+                        {formatCurrency(item.cantidad * item.precio_unitario)}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
           {/* Información de Envío */}
           <View style={styles.detailCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -1594,17 +1681,8 @@ function OrderDetailsModal({
               <Text style={styles.detailCardTitle}>Información de Envío</Text>
             </View>
              
-            <Text style={[styles.detailText, { marginBottom: 6 }]}>Número de Tracking</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ingresá el número de seguimiento"
-              placeholderTextColor={C.muted}
-              value={editData.tracking_number}
-              onChangeText={(text) => setEditData({ ...editData, tracking_number: text })}
-            />
-             
             {order.tipo_envio && (
-              <Text style={[styles.detailText, { marginTop: 8 }]}>
+              <Text style={[styles.detailText, { marginBottom: 8 }]}>
                 <Text style={{ fontWeight: '700' }}>Tipo: </Text>
                 {order.tipo_envio}
               </Text>
@@ -1613,6 +1691,12 @@ function OrderDetailsModal({
               <Text style={styles.detailText}>
                 <Text style={{ fontWeight: '700' }}>Método: </Text>
                 {order.metodo_envio}
+              </Text>
+            )}
+            {order.direccion_envio && (
+              <Text style={[styles.detailText, { marginTop: 8 }]}>
+                <Text style={{ fontWeight: '700' }}>Dirección: </Text>
+                {order.direccion_envio}
               </Text>
             )}
           </View>

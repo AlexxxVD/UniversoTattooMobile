@@ -467,9 +467,25 @@ export default function ProfileScreen() {
 
   const reorder = useCallback(
     async (order: OrderWithTotals) => {
+      // Cargar detalles si no están
       if (!order._items?.length) {
-        Toast.show({ type: 'info', text1: 'Abriendo pedido…', text2: 'Cargando productos del pedido' });
-        await openOrderDetails(order);
+        Toast.show({ type: 'info', text1: 'Cargando pedido…' });
+        try {
+          const { data, error } = await supabase
+            .from('PedidoProducto')
+            .select('pedidoId,cantidad,precio_unitario,descuento,productoId,Producto(id_producto,nombre,sku,stock_total,precio_base,peso,ProductoImagen(url_imagen,es_principal))')
+            .eq('pedidoId', order.id_pedido);
+
+          if (error) throw error;
+          order._items = (data as any) ?? [];
+        } catch (e: any) {
+          Toast.show({ type: 'error', text1: 'No se pudo cargar el pedido' });
+          return;
+        }
+      }
+
+      if (!order._items?.length) {
+        Toast.show({ type: 'error', text1: 'Este pedido no tiene productos' });
         return;
       }
 
@@ -477,7 +493,7 @@ export default function ProfileScreen() {
       let skipped = 0;
 
       for (const it of order._items!) {
-        const pid = (it as any).Producto?.id_producto;
+        const pid = (it as any).productoId || (it as any).Producto?.id_producto;
         if (!pid) {
           skipped++;
           continue;
@@ -488,7 +504,9 @@ export default function ProfileScreen() {
             .from('Producto')
             .select('id_producto,nombre,precio_base,stock_total,sku,peso,ProductoImagen(url_imagen,es_principal)')
             .eq('id_producto', pid)
+            .eq('es_activo', true)
             .maybeSingle();
+          
           if (error || !data) {
             skipped++;
             continue;
@@ -499,18 +517,20 @@ export default function ProfileScreen() {
             ? (p.ProductoImagen.find((im: any) => im.es_principal) ?? p.ProductoImagen[0])?.url_imagen
             : null;
 
-          const qty = Math.min(Number((it as any).cantidad ?? 1), Number(p.stock_total ?? 0));
-          if (qty <= 0) {
+          const availableStock = Number(p.stock_total ?? 0);
+          if (availableStock <= 0) {
             skipped++;
             continue;
           }
+
+          const qty = Math.min(Number((it as any).cantidad ?? 1), availableStock);
 
           addItem({
             id: String(p.id_producto),
             nombre: p.nombre,
             precio: Number(p.precio_base ?? 0),
             imagen: mainImg ?? null,
-            stock: Number(p.stock_total ?? 0),
+            stock: availableStock,
             categoria: '',
             sku: p.sku ?? null,
             peso: p.peso ?? null,
@@ -527,15 +547,15 @@ export default function ProfileScreen() {
       if (added > 0) {
         Toast.show({
           type: 'success',
-          text1: 'Productos agregados',
-          text2: skipped > 0 ? `Agregados: ${added}. Sin stock/omitidos: ${skipped}.` : `Agregados: ${added}.`,
+          text1: '¡Productos agregados!',
+          text2: skipped > 0 ? `Agregados: ${added}. Sin stock: ${skipped}.` : `Se ${added === 1 ? 'agregó 1 producto' : `agregaron ${added} productos`}`,
         });
         router.push('/(client)/cart');
       } else {
-        Toast.show({ type: 'error', text1: 'Sin stock', text2: 'No se pudieron agregar productos' });
+        Toast.show({ type: 'error', text1: 'Sin stock', text2: 'Los productos no están disponibles' });
       }
     },
-    [addItem, openOrderDetails, router]
+    [addItem, router]
   );
 
   if (loading) {
