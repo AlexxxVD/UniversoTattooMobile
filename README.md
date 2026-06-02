@@ -38,7 +38,7 @@ El proyecto está construido sobre una arquitectura robusta y escalable[cite: 1]
 
 El enrutamiento de la aplicación utiliza la estructura nativa de **Expo Router**, dividida estratégicamente por roles y flujos de usuario[cite: 1]:
 
-```text
+```
 UniversoTattooMobile/
 ├── app/
 │   ├── (admin)/            # Panel de control de administración
@@ -72,6 +72,8 @@ UniversoTattooMobile/
 ├── DEPLOY_WEB.md           # Documentación para el despliegue web
 ├── EMAIL_SYSTEM_README.md  # Documentación del sistema de emails integrado
 └── REVISION_SISTEMA_TESIS.md # Registro y control de revisión de tesis
+
+```
 
 Configuración e Instalación
 Prerrequisitos
