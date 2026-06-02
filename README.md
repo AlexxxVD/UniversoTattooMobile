@@ -1,50 +1,114 @@
-# Welcome to your Expo app 👋
+# Universo Tattoo Mobile 
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+¡Bienvenido a **Universo Tattoo Mobile**! Una solución mobile integral desarrollada como proyecto de tesis final. La aplicación está diseñada para conectar de forma eficiente a entusiastas del tatuaje con artistas y estudios, ofreciendo además una tienda de productos e insumos relacionados, gestión de turnos, pasarela de pagos y un módulo de administración completo.
 
-## Get started
+---
 
-1. Install dependencies
+##  Características Principales
 
-   ```bash
+###  Módulo de Usuarios y Autenticación
+*   **Flujo de Registro y Verificación:** Sistema seguro con confirmación de cuenta y verificación pendiente.
+*   **Recuperación de Contraseña:** Flujo completo para restablecer credenciales de forma segura.
+
+###  Tienda y Carrito (Módulo Cliente)
+*   **Catálogo de Productos:** Exploración de insumos, indumentaria o accesorios con vista de detalle dinámica basada en ID.
+*   **Gestión de Carrito:** Adición, modificación y eliminación de productos en tiempo real antes del checkout.
+*   **Flujo de Pagos Integrado:** Pantallas dedicadas para el seguimiento del estado del pago (Pendiente, Confirmado y Fallido).
+
+###  Información y Soporte
+*   Módulos informativos de envíos, políticas de devoluciones, términos y condiciones, y sección de Preguntas Frecuentes (FAQ)[cite: 1].
+
+###  Panel de Administración (`(admin)`)
+*   **Dashboard de Control:** Gestión centralizada de pedidos, órdenes de compra, categorías y clientes para los administradores del estudio[cite: 1].
+
+---
+
+## Stack Tecnológico
+
+El proyecto está construido sobre una arquitectura robusta y escalable[cite: 1]:
+
+*   **Framework:** React Native con **Expo Router** (Estructura basada en archivos dentro de la carpeta `app/`)[cite: 1].
+*   **Lenguaje:** TypeScript para un tipado estático, garantizando un código mantenible y robusto[cite: 1].
+*   **Backend-as-a-Service:** Supabase (Autenticación, PostgreSQL en tiempo real y Storage para imágenes de portfolios y productos)[cite: 1].
+*   **Servicios de Email:** Sistema avanzado de notificaciones por correo electrónico integrado para alertas del sistema y confirmaciones[cite: 1].
+
+---
+
+##  Estructura del Proyecto
+
+El enrutamiento de la aplicación utiliza la estructura nativa de **Expo Router**, dividida estratégicamente por roles y flujos de usuario[cite: 1]:
+
+```text
+UniversoTattooMobile/
+├── app/
+│   ├── (admin)/            # Panel de control de administración
+│   │   ├── categories.tsx  # Gestión de categorías de productos
+│   │   ├── customers.tsx   # Control de clientes
+│   │   ├── orders.tsx      # Gestión de órdenes y pedidos
+│   │   ├── products.tsx    # ABM de productos/insumos
+│   │   └── settings.tsx    # Configuración del panel administrador
+│   ├── (auth)/             # Flujo de autenticación de usuarios
+│   │   ├── confirm.tsx
+│   │   ├── forgot-password.tsx
+│   │   ├── register.tsx
+│   │   ├── reset-password.tsx
+│   │   └── verify-pending.tsx
+│   ├── (client)/           # Interfaz principal del cliente
+│   │   ├── pago/           # Flujo de pasarela de pagos
+│   │   │   ├── confirmado.tsx
+│   │   │   ├── fallido.tsx
+│   │   │   └── pendiente.tsx
+│   │   ├── product/
+│   │   │   └── [id].tsx    # Detalle dinámico del producto
+│   │   ├── cart.tsx        # Carrito de compras
+│   │   ├── checkout.tsx    # Proceso de finalización de compra
+│   │   ├── store.tsx       # Tienda principal
+│   │   └── ...             # FAQ, Envíos, Devoluciones, Perfil
+│   ├── _layout.tsx         # Layout raíz y proveedores globales
+│   └── index.tsx           # Punto de entrada de la aplicación
+├── assets/                 # Recursos estáticos (Imágenes WebP optimizadas)
+├── .env                    # Variables de entorno (Supabase Keys, etc.)
+├── app.json                # Configuración global de Expo
+├── DEPLOY_WEB.md           # Documentación para el despliegue web
+├── EMAIL_SYSTEM_README.md  # Documentación del sistema de emails integrado
+└── REVISION_SISTEMA_TESIS.md # Registro y control de revisión de tesis
+
+Configuración e Instalación
+Prerrequisitos
+Node.js (v18 o superior)[cite: 1]
+
+Expo Go instalado en tu dispositivo móvil o un emulador configurado (Android Studio / Xcode)[cite: 1].
+
+Pasos
+Clonar el repositorio:
+
+Bash
+   git clone [https://github.com/alexxxvd/universotattoomobile.git](https://github.com/alexxxvd/universotattoomobile.git)
+   cd universo-tattoo-mobile
+Instalar dependencias:
+
+Bash
    npm install
-   ```
+Configurar Variables de Entorno:
+Edita el archivo .env en la raíz del proyecto agregando tus credenciales de Supabase[cite: 1]:
 
-2. Start the app
+Fragmento de código
+   SUPABASE_URL=tu_url_de_supabase
+   SUPABASE_ANON_KEY=tu_anon_key_de_supabase
+Iniciar el servidor de desarrollo de Expo:
 
-   ```bash
+Bash
    npx expo start
-   ```
+Presioná a para emulador de Android, i para emulador de iOS, o escaneá el código QR con la app Expo Go en tu celular.
 
-In the output, you'll find options to open the app in a
+Documentación Adicional del Proyecto
+Para profundizar en aspectos específicos del desarrollo, revisá los siguientes archivos incluidos en la raíz[cite: 1]:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+REVISION_SISTEMA_TESIS.md: Notas, correcciones y estado actual del sistema de cara a la entrega de la carrera[cite: 1].
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+EMAIL_SYSTEM_README.md: Detalle técnico del funcionamiento del backend de mensajería y plantillas de correo[cite: 1].
 
-## Get a fresh project
+DEPLOY_WEB.md: Instrucciones específicas por si se requiere compilar o visualizar módulos de la plataforma en entorno web[cite: 1].
 
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+ Autor
+Alexander Varela - Analista de Sistemas & Full Stack Developer
